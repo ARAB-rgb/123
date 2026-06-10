@@ -1477,45 +1477,90 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
   // Auth Layout rendering check
   if (!currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center mesh-gradient p-4 text-right" dir="rtl">
+      <div className="min-h-screen flex items-center justify-center mesh-gradient p-4 text-right selection:bg-amber-500/30 select-none overflow-hidden relative" dir="rtl">
         <Toast toasts={toasts} removeToast={removeToast} />
         
-        <div className="w-full max-w-md glass-card p-8 rounded-3xl space-y-6">
-          <div className="text-center space-y-3">
-            <div className="w-14 h-16 bg-gradient-to-tr from-amber-500 to-amber-600 rounded-2xl mx-auto shadow-lg flex items-center justify-center relative">
-              <span className="text-slate-950 font-black text-xl">AW</span>
+        {/* Absolute Decorative Golden Ambient Lights */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+        
+        {/* Core Luxury Card */}
+        <div className="w-full max-w-md bg-slate-950/40 backdrop-blur-2xl border border-amber-500/25 p-10 rounded-[32px] space-y-8 relative shadow-[0_0_50px_-5px_rgba(245,158,11,0.15)] overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-b before:from-amber-500/5 before:to-transparent before:pointer-events-none">
+          
+          {/* Subtle Corner Golden Aesthetics */}
+          <div className="absolute top-0 right-0 w-16 h-16 border-t-2 border-r-2 border-amber-500/30 rounded-tr-[32px] pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-16 h-16 border-b-2 border-l-2 border-amber-500/30 rounded-bl-[32px] pointer-events-none"></div>
+
+          {/* Premium Branded Seal Header */}
+          <div className="text-center space-y-4 relative z-10">
+            {/* Multi-ring Royal Emblem */}
+            <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border border-amber-500/20 animate-[spin_12s_linear_infinite]"></div>
+              <div className="absolute inset-1.5 rounded-full border-2 border-dashed border-amber-500/40"></div>
+              <div className="absolute inset-3 bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-400 rounded-full shadow-[0_0_20px_rgba(245,158,11,0.4)] flex items-center justify-center">
+                <Sparkles className="w-7 h-7 text-slate-950 animate-pulse" />
+              </div>
+              {/* Floating Orbit Beads */}
+              <div className="absolute top-0 left-1/2 -ml-1 w-2 h-2 bg-amber-400 rounded-full animate-ping"></div>
             </div>
-            <h1 className="text-2xl font-black text-white tracking-wide">نظام مالي عرب وورلد</h1>
-            <p className="text-xs font-bold text-slate-400">يرجى تأكيد بيانات الهوية والمصادقة للولوج المالي الآمن</p>
+
+            <div className="space-y-1.5">
+              <h2 className="text-[10px] tracking-[0.25em] font-black text-amber-500/80 uppercase font-sans">ARAB WORLD GROUP</h2>
+              <h1 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-100 to-slate-300">
+                عرب وورلد المالي
+              </h1>
+              <p className="text-[11px] font-medium text-slate-400 max-w-xs mx-auto leading-relaxed">
+                الإدارة الذاتية المتكاملة والمصادقة الأمنية الموحدة للمقاولات والتقسيط
+              </p>
+            </div>
+
+            {/* Glowing Status Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full">
+              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping"></span>
+              <span className="text-[9px] font-bold text-amber-400 font-mono tracking-wider">SECURE SHIELD v27.4</span>
+            </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400">كود المستخدم الخاص</label>
-              <div className="relative">
-                <User className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-500" />
+          {/* Divider */}
+          <div className="relative h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent my-1">
+            <span className="absolute left-1/2 -top-1.5 -ml-1.5 w-3 h-3 bg-slate-950 border border-slate-800 rotate-45 flex items-center justify-center">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+            </span>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5 relative z-10">
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center px-1">
+                <label className="text-[10px] font-black tracking-wider text-slate-300">كود الموظف / المعرّف الخاص</label>
+                <span className="text-[9px] text-slate-500 font-mono">USER CODE</span>
+              </div>
+              <div className="relative h-12">
+                <User className="absolute right-4 top-3.5 w-4.5 h-4.5 text-amber-500/60 transition-colors duration-200" />
                 <input
                   required
                   type="text"
-                  placeholder="رقم الكود"
+                  placeholder="أدخل كودك المالي أو الوظيفي..."
                   value={loginCode}
                   onChange={(e) => setLoginCode(e.target.value)}
-                  className="w-full pl-3 pr-10 py-3 glass-input rounded-2xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none transition-colors"
+                  className="w-full h-full pl-4 pr-11 py-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/85 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)] transition-all"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400">الرقم المالي السري</label>
-              <div className="relative">
-                <Key className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-500" />
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center px-1">
+                <label className="text-[10px] font-black tracking-wider text-slate-300">الرمز السري المالي</label>
+                <span className="text-[9px] text-slate-500 font-mono">ACCESS CODE</span>
+              </div>
+              <div className="relative h-12">
+                <Key className="absolute right-4 top-3.5 w-4.5 h-4.5 text-amber-500/60 transition-colors duration-200" />
                 <input
                   required
                   type="password"
-                  placeholder="Password"
+                  placeholder="••••••••"
                   value={loginPass}
                   onChange={(e) => setLoginPass(e.target.value)}
-                  className="w-full pl-3 pr-10 py-3 glass-input rounded-2xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none transition-colors"
+                  className="w-full h-full pl-4 pr-11 py-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/85 focus:shadow-[0_0_15px_rgba(245,158,11,0.15)] transition-all font-mono"
                 />
               </div>
             </div>
@@ -1523,15 +1568,33 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
             <button
               disabled={isLoading}
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-l from-amber-500 to-amber-600 text-slate-950 font-black rounded-2xl text-xs hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/15 cursor-pointer disabled:opacity-50 glass-btn"
+              className="w-full h-12 bg-gradient-to-l from-amber-500 via-amber-600 to-yellow-500 text-slate-950 font-black rounded-2xl text-xs hover:from-amber-400 hover:to-amber-500 transition-all shadow-[0_4px_20px_rgba(245,158,11,0.25)] hover:shadow-[0_4px_30px_rgba(245,158,11,0.4)] hover:scale-[1.01] active:scale-[0.99] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isLoading ? "تسجيل مالي آمن جاري..." : "اعتماد وتصديق السجل"}
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                  <span>تأمين الاتصال وبناء الجلسة...</span>
+                </>
+              ) : (
+                <>
+                  <Shield className="w-4 h-4 text-slate-950" />
+                  <span>اعتماد الدخول وتطهير الأذونات الهيكلية</span>
+                </>
+              )}
             </button>
           </form>
 
-          <p className="text-center text-[10px] font-bold text-slate-500">
-            مستند مراجعة الفرع محمي بمقتضى سياست الخصوصيّة
-          </p>
+          {/* Footer branding */}
+          <div className="pt-2 text-center space-y-2 relative z-10">
+            <div className="flex items-center justify-center gap-1.5 text-[9px] text-slate-500 font-bold">
+              <span>🔒 تشفير محمي 256 بت</span>
+              <span>•</span>
+              <span>مراجعة الآليات التشغيلية نشطة</span>
+            </div>
+            <p className="text-[9px] font-medium text-slate-600 leading-relaxed max-w-xs mx-auto">
+              بموجب أنظمة هيئة المقاولات واللوائح والائتمان الموحدة لشركة عرب وورلد للمقاولات العامة والتقسيط.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -1635,37 +1698,46 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Responsive Navbar heading with glowing sparkles */}
-        <header className="bg-white/5 backdrop-blur-lg border-b border-white/5 p-4 md:p-5 shrink-0 flex flex-col sm:flex-row gap-4 justify-between items-center z-10 text-right">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-            <h1 className="text-sm md:text-base font-black text-white">شركة عرب وورلد للمقاولات العامة والتقسيط</h1>
+        <header className="bg-slate-950/40 backdrop-blur-2xl border-b border-amber-500/10 p-5 shrink-0 flex flex-col lg:flex-row gap-5 justify-between items-center z-10 text-right relative overflow-hidden before:absolute before:bottom-0 before:left-0 before:right-0 before:h-[1px] before:bg-gradient-to-r before:from-transparent before:via-amber-500/20 before:to-transparent">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-yellow-500 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+              <Sparkles className="w-5 h-5 text-slate-950 animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-base md:text-lg font-black tracking-tight text-white flex items-center gap-2 font-sans">
+                <span>شركة</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-l from-amber-400 via-yellow-200 to-amber-500 drop-shadow-[0_2px_10px_rgba(245,158,11,0.15)]">عرب وورلد</span>
+                <span className="text-xs font-bold text-slate-300">للمقاولات العامة والتقسيط</span>
+              </h1>
+              <p className="text-[9px] text-slate-400 font-medium tracking-wide mt-0.5">البوابة الإدارية والمنظومة الحسابية المتكاملة الموثقة</p>
+            </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3.5">
             {/* رأس مال الشركة في العقود */}
-            <div className="bg-slate-900/80 border border-amber-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-right">
-              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <div className="bg-gradient-to-b from-slate-900/60 to-slate-950/60 border border-amber-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 text-right shadow-lg shadow-amber-500/5 relative before:absolute before:inset-0 before:rounded-2xl before:bg-amber-500/5 before:pointer-events-none">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse" />
               <div>
-                <span className="block text-[8px] md:text-[9px] font-bold text-slate-400 leading-normal">رأس مال الشركة بالعقود</span>
-                <span className="block text-xs font-black text-blue-300 font-mono">
-                  {companyCapitalInContracts.toLocaleString()} <span className="text-[9px] font-normal">ريال</span>
+                <span className="block text-[8px] md:text-[9px] font-black text-amber-500/80 leading-normal uppercase">رأس مال الشركة بالعقود</span>
+                <span className="block text-sm font-black text-amber-100 font-mono">
+                  {companyCapitalInContracts.toLocaleString()} <span className="text-[10px] font-bold text-slate-400">ريال</span>
                 </span>
               </div>
             </div>
 
             {/* رأس مال التحصيل في العقود */}
-            <div className="bg-slate-900/80 border border-emerald-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-right">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="bg-gradient-to-b from-slate-900/60 to-slate-950/60 border border-emerald-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 text-right shadow-lg shadow-emerald-500/5 relative before:absolute before:inset-0 before:rounded-2xl before:bg-emerald-500/5 before:pointer-events-none">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse" />
               <div>
-                <span className="block text-[8px] md:text-[9px] font-bold text-slate-400 leading-normal">رأس مال التحصيل بالعقود</span>
-                <span className="block text-xs font-black text-emerald-300 font-mono">
-                  {collectionCapitalInContracts.toLocaleString()} <span className="text-[9px] font-normal">ريال</span>
+                <span className="block text-[8px] md:text-[9px] font-black text-emerald-400 leading-normal uppercase">رأس مال التحصيل بالعقود</span>
+                <span className="block text-sm font-black text-emerald-100 font-mono">
+                  {collectionCapitalInContracts.toLocaleString()} <span className="text-[10px] font-bold text-slate-400">ريال</span>
                 </span>
               </div>
             </div>
 
-            <span className="text-[10px] font-black font-mono text-slate-300 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 shrink-0">
-              نظام مالي موحد • V27 STABLE
+            <span className="text-[10px] font-black font-sans text-amber-400 bg-amber-500/10 px-4 py-2.5 rounded-xl border border-amber-500/20 shadow-inner shrink-0">
+              🏛️ نظام ذهبي موحد • V27
             </span>
           </div>
         </header>
