@@ -1272,7 +1272,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                           <span className="px-2.5 py-0.5 rounded text-[11px] font-black bg-slate-800 text-slate-100">{q.status}</span>
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditQuoteId(q.id); setQClient(q.client); setQPhone(q.phone); setQProject(q.project); setQAmount(q.amount); setQNotes(q.notes || ""); }} className="p-1 text-blue-400 hover:text-white inline-block"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditQuoteId(q.id); setQClient(q.client || ""); setQPhone(q.phone || ""); setQProject(q.project || ""); setQAmount(q.amount || ""); setQNotes(q.notes || ""); }} className="p-1 text-blue-400 hover:text-white inline-block"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("حذف العرض بشكل نهائي؟")) { sb.from("quotes").delete().eq("id", q.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500 inline-block"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
@@ -1415,7 +1415,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                               {awCleanNotes(r.notes || "")}
                             </td>
                             <td className="py-3 px-3 text-center space-x-1">
-                              <button onClick={() => { setEditReceiptId(r.id); handleAutoFillReceipt(r.contract_no || ""); setRFrom(r.from_name); setRAmount(r.amount); setRMethod(r.method); setRDate(r.date); setRProject(r.project); setRNotes(awCleanNotes(r.notes || "")); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => { setEditReceiptId(r.id); handleAutoFillReceipt(r.contract_no || ""); setRFrom(r.from_name || ""); setRAmount(r.amount || ""); setRMethod(r.method || ""); setRDate(r.date || ""); setRProject(r.project || ""); setRNotes(awCleanNotes(r.notes || "")); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                               <button onClick={() => deleteReceiptLogic(r.id, r.installment_id)} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                             </td>
                           </tr>
@@ -1509,7 +1509,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                           {awCleanNotes(p.notes || "")}
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditPaymentId(p.id); setPayTo(p.to_name); setPayAmount(p.amount); setPayMethod(p.method); setPayDate(p.date); setPayProject(p.project); setPayNotes(awCleanNotes(p.notes || "")); setPayTreasury(awExtractTreasury(p.notes || "") || "خزنة الشركة"); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditPaymentId(p.id); setPayTo(p.to_name || ""); setPayAmount(p.amount || ""); setPayMethod(p.method || ""); setPayDate(p.date || ""); setPayProject(p.project || ""); setPayNotes(awCleanNotes(p.notes || "")); setPayTreasury(awExtractTreasury(p.notes || "") || "خزنة الشركة"); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("تأكيد الحذف؟")) { sb.from("payments").delete().eq("id", p.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
@@ -1580,7 +1580,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                         </td>
                         <td className="py-3 px-3 text-slate-400 max-w-xs truncate">{awCleanNotes(e.notes || "")}</td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditExpenseId(e.id); setEName(e.name); setECategory(e.category); setEAmount(e.amount); setEDate(e.date); setEProject(e.project); setESupplier(e.supplier || ""); setENotes(awCleanNotes(e.notes || "")); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditExpenseId(e.id); setEName(e.name || ""); setECategory(e.category || ""); setEAmount(e.amount || ""); setEDate(e.date || ""); setEProject(e.project || ""); setESupplier(e.supplier || ""); setENotes(awCleanNotes(e.notes || "")); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("تأكيد الحذف؟")) { sb.from("expenses").delete().eq("id", e.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
@@ -1653,7 +1653,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                           <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black ${p.status === "نشط" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>{p.status}</span>
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditProjectId(p.id); setPName(p.name); setPLocation(p.location); setPEngineer(p.engineer || ""); setPBudget(p.budget || ""); setPProgress(p.progress || ""); setPStatus(p.status); setPNotes(p.notes || ""); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditProjectId(p.id); setPName(p.name || ""); setPLocation(p.location || ""); setPEngineer(p.engineer || ""); setPBudget(p.budget || ""); setPProgress(p.progress !== undefined && p.progress !== null ? p.progress : 0); setPStatus(p.status || "نشط"); setPNotes(p.notes || ""); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("حذف ملف المشروع بشكل نهائي؟")) { sb.from("projects").delete().eq("id", p.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
@@ -1732,7 +1732,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                           <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black ${w.status === "على رأس العمل" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-850 text-slate-400"}`}>{w.status}</span>
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditWorkerId(w.id); setWName(w.name); setWId(w.worker_id || ""); setWPhone(w.phone || ""); setWJob(w.job); setWProject(w.project || ""); setWDaily(w.daily || ""); setWDays(w.days || ""); setWAdvance(w.advance || 0); setWStatus(w.status); setWNotes(w.notes || ""); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditWorkerId(w.id); setWName(w.name || ""); setWId(w.worker_id || ""); setWPhone(w.phone || ""); setWJob(w.job || "عامل"); setWProject(w.project || ""); setWDaily(w.daily || ""); setWDays(w.days || ""); setWAdvance(w.advance !== undefined && w.advance !== null ? w.advance : 0); setWStatus(w.status || "على رأس العمل"); setWNotes(w.notes || ""); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("مسح العامل من قوائم الحساب؟")) { sb.from("workers").delete().eq("id", w.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
@@ -1842,10 +1842,10 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                             <button
                               onClick={() => {
                                 setEditUserId(u.id);
-                                setUName(u.name);
-                                setUCode(u.code);
+                                setUName(u.name || "");
+                                setUCode(u.code || "");
                                 setUPass(u.password || "");
-                                setURole(u.role);
+                                setURole(u.role || "employee");
                                 setURegion(permissionsObj.region || "");
                                 setUPerms({
                                   ...permissionsObj,
