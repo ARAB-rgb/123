@@ -165,6 +165,7 @@ export default function App() {
   const [cPassport, setCPassport] = useState("");
   const [cProbation, setCProbation] = useState("90 يوم");
   const [cVacation, setCVacation] = useState<number | "">(30);
+  const [cUserId, setCUserId] = useState<string>("");
 
   // Leave Form
   const [lhStart, setLhStart] = useState(new Date().toISOString().slice(0, 10));
@@ -890,6 +891,10 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
     setCProbation(contract.probation || "90 يوم");
     setCVacation(contract.vacation || 30);
 
+    // Scan for linked user account
+    const linkedUser = users.find(u => (u.perms?.worker_id === w.worker_id && w.worker_id) || (u.worker_id === w.worker_id && w.worker_id));
+    setCUserId(linkedUser ? linkedUser.id : "");
+
     // Clear/init leave forms
     setLhStart(new Date().toISOString().slice(0, 10));
     setLhEnd("");
@@ -926,8 +931,35 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
         return;
       }
 
+      // Link/Assign career contract to login user account automatically
+      if (cUserId) {
+        const targetUser = users.find(u => u.id === cUserId);
+        if (targetUser) {
+          const updatedPerms = {
+            ...(targetUser.perms || {}),
+            worker_id: selectedWorkerForHr.worker_id || selectedWorkerForHr.id,
+          };
+          await sb.from("users").update({ perms: updatedPerms }).eq("id", cUserId);
+        }
+
+        // Unlink previous user accounts
+        const otherLinked = users.filter(u => u.id !== cUserId && (u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id));
+        for (const ou of otherLinked) {
+          const cleanedPerms = { ...(ou.perms || {}) };
+          delete cleanedPerms.worker_id;
+          await sb.from("users").update({ perms: cleanedPerms }).eq("id", ou.id);
+        }
+      } else {
+        const currentlyLinked = users.filter(u => u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id);
+        for (const clu of currentlyLinked) {
+          const cleanedPerms = { ...(clu.perms || {}) };
+          delete cleanedPerms.worker_id;
+          await sb.from("users").update({ perms: cleanedPerms }).eq("id", clu.id);
+        }
+      }
+
       await logSession(currentUser!, `تحديث عقد وتفاصيل الموظف: ${selectedWorkerForHr.name}`);
-      showToast("تم حفظ تفاصيل عقد العمل بنجاح.");
+      showToast("تم حفظ بنود عقد العمل وتحديث الربط الذاتي تلقائياً.");
       
       const updatedWorker = { ...selectedWorkerForHr, notes: finalNotes };
       setSelectedWorkerForHr(updatedWorker);
@@ -2330,6 +2362,23 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                                 className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" 
                               />
                             </div>
+                          </div>
+
+                          <div className="space-y-1 bg-amber-500/5 p-2 rounded-xl border border-amber-500/10">
+                            <label className="text-[10px] text-slate-300 font-bold block">🔐 ربط ملف العقد والخدمة الذاتية بحساب مستخدم جاري</label>
+                            <select 
+                              value={cUserId} 
+                              onChange={(e) => setCUserId(e.target.value)} 
+                              className="w-full px-2 py-1.5 bg-slate-905 border border-slate-800 rounded-lg text-[11px] font-bold text-amber-400 focus:outline-none cursor-pointer text-slate-950 bg-white"
+                            >
+                              <option value="" className="text-slate-950">❌ غير مربوط بحساب مستخدم (اضغط لربط حساب مالي)</option>
+                              {users.map((u) => (
+                                <option key={u.id} value={u.id} className="text-slate-950">
+                                  👤 {u.name} (كود: {u.code} • {u.role === "admin" ? "مدير" : "موظف"})
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-[9px] text-slate-400 mt-1 leading-relaxed">يرتبط هذا العقد تلقائياً بحساب الموظف المحدد لتفعيل ملفه وطلباته للخدمة الذاتية بشكل مباشر.</p>
                           </div>
 
                           <button 
