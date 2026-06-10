@@ -14,7 +14,8 @@ import { User as AuthUser, Installment, Quote, Receipt, Payment, Expense, Projec
 import {
   sb, logSession, getContractTiming, awExtractRegion, awCleanNotes,
   awBuildNotesWithRegion, awBuildNotesWithRegionAndTreasury, awBuildNotesWithRegionAndTreasuryAndCapital, awExtractTreasury, awExtractCapital, generateNextNo,
-  awExtractCapitalSource, awExtractCapitalCompany, awExtractCapitalCollection
+  awExtractCapitalSource, awExtractCapitalCompany, awExtractCapitalCollection,
+  awExtractWorkerContract, awExtractWorkerLeaves, awBuildWorkerNotes, awCleanWorkerNotes
 } from "./db";
 
 import { Toast, ToastItem, ToastType } from "./components/Shared/Toast";
@@ -149,6 +150,32 @@ export default function App() {
   const [wAdvance, setWAdvance] = useState<number | "">(0);
   const [wStatus, setWStatus] = useState<"على رأس العمل" | "إجازة" | "موقوف">("على رأس العمل");
   const [wNotes, setWNotes] = useState("");
+
+  // 10. HR States
+  const [selectedWorkerForHr, setSelectedWorkerForHr] = useState<Worker | null>(null);
+  
+  // Employment Contract Forms
+  const [cStart, setCStart] = useState("");
+  const [cDuration, setCDuration] = useState("سنة واحدة");
+  const [cSalary, setCSalary] = useState<number | "">("");
+  const [cHousing, setCHousing] = useState<number | "">("");
+  const [cTransport, setCTransport] = useState<number | "">("");
+  const [cOther, setCOther] = useState<number | "">("");
+  const [cPassport, setCPassport] = useState("");
+  const [cProbation, setCProbation] = useState("90 يوم");
+  const [cVacation, setCVacation] = useState<number | "">(30);
+
+  // Leave Form
+  const [lhStart, setLhStart] = useState(new Date().toISOString().slice(0, 10));
+  const [lhEnd, setLhEnd] = useState("");
+  const [lhType, setLhType] = useState("إجازة اعتيادية");
+  const [lhNotes, setLhNotes] = useState("");
+
+  // Advance / Loan Request Form
+  const [advAmount, setAdvAmount] = useState<number | "">("");
+  const [advTreasury, setAdvTreasury] = useState("خزنة الشركة");
+  const [advNotes, setAdvNotes] = useState("");
+  const [advDate, setAdvDate] = useState(new Date().toISOString().slice(0, 10));
 
   // 7. Users Forms
   const [uName, setUName] = useState("");
@@ -845,6 +872,325 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // HR & Worker Profile Operations
+  const initHrWorker = (w: Worker) => {
+    setSelectedWorkerForHr(w);
+    const contract = awExtractWorkerContract(w.notes || "");
+    setCStart(contract.start || "");
+    setCDuration(contract.duration || "سنة واحدة");
+    setCSalary(contract.salary || "");
+    setCHousing(contract.housing || "");
+    setCTransport(contract.transport || "");
+    setCOther(contract.other || "");
+    setCPassport(contract.passport || "");
+    setCProbation(contract.probation || "90 يوم");
+    setCVacation(contract.vacation || 30);
+
+    // Clear/init leave forms
+    setLhStart(new Date().toISOString().slice(0, 10));
+    setLhEnd("");
+    setLhNotes("");
+    
+    // Clear/init advance forms
+    setAdvAmount("");
+    setAdvNotes("");
+    setAdvDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const saveWorkerContractLogic = async () => {
+    if (!selectedWorkerForHr) return;
+    setIsLoading(true);
+    try {
+      const contractObj = {
+        start: cStart,
+        duration: cDuration,
+        salary: Number(cSalary || 0),
+        housing: Number(cHousing || 0),
+        transport: Number(cTransport || 0),
+        other: Number(cOther || 0),
+        passport: cPassport.trim(),
+        probation: cProbation.trim(),
+        vacation: Number(cVacation || 30),
+      };
+      const existingLeaves = awExtractWorkerLeaves(selectedWorkerForHr.notes || "");
+      const rawNotes = awCleanWorkerNotes(selectedWorkerForHr.notes || "");
+      const finalNotes = awBuildWorkerNotes(rawNotes, contractObj, existingLeaves);
+
+      const { error } = await sb.from("workers").update({ notes: finalNotes }).eq("id", selectedWorkerForHr.id);
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+
+      await logSession(currentUser!, `تحديث عقد وتفاصيل الموظف: ${selectedWorkerForHr.name}`);
+      showToast("تم حفظ تفاصيل عقد العمل بنجاح.");
+      
+      const updatedWorker = { ...selectedWorkerForHr, notes: finalNotes };
+      setSelectedWorkerForHr(updatedWorker);
+      await loadEverything();
+    } catch {
+      showToast("لم نتمكن من الاتصال بالملقم لتحديث عقد الموظف", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addWorkerLeaveLogic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWorkerForHr || !lhStart || !lhEnd) return;
+    setIsLoading(true);
+    try {
+      const newLeave = {
+        id: Math.random().toString(36).substring(7),
+        start: lhStart,
+        end: lhEnd,
+        type: lhType,
+        notes: lhNotes.trim()
+      };
+      const existingLeaves = awExtractWorkerLeaves(selectedWorkerForHr.notes || "");
+      const finalLeaves = [...existingLeaves, newLeave];
+
+      const contractObj = awExtractWorkerContract(selectedWorkerForHr.notes || "");
+      const rawNotes = awCleanWorkerNotes(selectedWorkerForHr.notes || "");
+      const finalNotes = awBuildWorkerNotes(rawNotes, contractObj, finalLeaves);
+
+      const { error } = await sb.from("workers").update({
+        notes: finalNotes,
+        status: "إجازة"
+      }).eq("id", selectedWorkerForHr.id);
+
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+
+      await logSession(currentUser!, `تسجيل طلب إجازة (${lhType}) للموظف: ${selectedWorkerForHr.name}`);
+      showToast("تم تسجيل طلب الإجازة بنجاح وتحديث وضعية الموظف.");
+      
+      setLhEnd("");
+      setLhNotes("");
+      
+      const updatedWorker = { ...selectedWorkerForHr, notes: finalNotes, status: "إجازة" as any };
+      setSelectedWorkerForHr(updatedWorker);
+      await loadEverything();
+    } catch {
+      showToast("حدث خلل أثناء تسجيل طلب الإجازة", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addWorkerAdvanceLogic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWorkerForHr || !advAmount) return;
+    setIsLoading(true);
+    try {
+      const amt = Number(advAmount);
+      const payRow = {
+        no: generateNextNo("AW-PAY", payments, "no"),
+        to_name: `سلفة الموظف: ${selectedWorkerForHr.name}`,
+        amount: amt,
+        method: "نقدي",
+        date: advDate,
+        project: selectedWorkerForHr.project || "عام",
+        notes: awBuildNotesWithRegionAndTreasury(
+          `قيد سلفة مستحقة للموظف. ${advNotes}`.trim(),
+          selectedWorkerForHr.project ? "" : (currentUser?.perms?.region || ""),
+          advTreasury
+        ),
+      };
+
+      const { error: payErr } = await sb.from("payments").insert(payRow);
+      if (payErr) {
+        showToast(payErr.message, "error");
+        return;
+      }
+
+      const currentAdvance = Number(selectedWorkerForHr.advance || 0);
+      const newAdvance = currentAdvance + amt;
+      const tot = Number(selectedWorkerForHr.daily || 0) * Number(selectedWorkerForHr.days || 0);
+      const newBalance = Math.max(0, tot - newAdvance);
+
+      const { error: workerErr } = await sb.from("workers").update({
+        advance: newAdvance,
+        balance: newBalance
+      }).eq("id", selectedWorkerForHr.id);
+
+      if (workerErr) {
+        showToast(workerErr.message, "error");
+        return;
+      }
+
+      await logSession(currentUser!, `طلب سلفة مالي بقيمة ${amt} ريال للموظف: ${selectedWorkerForHr.name}`);
+      showToast("تم اعتماد السلفة وصرف المبلغ ماليًا وتحديث السجل.");
+
+      setAdvAmount("");
+      setAdvNotes("");
+      
+      const updatedWorker = { ...selectedWorkerForHr, advance: newAdvance, balance: newBalance };
+      setSelectedWorkerForHr(updatedWorker);
+      await loadEverything();
+    } catch {
+      showToast("حدث خلل عارض في قيد الصرف الخاص بالسلفة للموظف", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onPrintWorkerContract = (worker: Worker) => {
+    const contract = awExtractWorkerContract(worker.notes || "");
+    const basicSalary = Number(contract.salary || 0);
+    const housing = Number(contract.housing || 0);
+    const transport = Number(contract.transport || 0);
+    const other = Number(contract.other || 0);
+    const totalSalary = basicSalary + housing + transport + other;
+
+    const w = window.open("", "_blank");
+    if (!w) {
+      showToast("تنبيه: ملقم المتصفح حظر نافذة الطباعة التلقائية!", "info");
+      return;
+    }
+
+    w.document.write(`
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>عقد عمل موحد - ${worker.name}</title>
+<style>
+  * { box-sizing: border-box; font-family: Tahoma, Arial, sans-serif; }
+  body { margin: 0; padding: 25px; background: #fff; color: #111; line-height: 1.6; font-size: 13px; }
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 24px; }
+  .header h2 { margin: 0; color: #2b6cb0; font-size: 20px; font-weight: bold; }
+  .header-left, .header-right { font-size: 11px; }
+  .contract-title { text-align: center; margin-bottom: 30px; }
+  .contract-title h1 { margin: 0; font-size: 22px; color: #1a365d; border-bottom: 1px solid #ddd; display: inline-block; padding-bottom: 6px; }
+  .section-title { font-size: 14px; font-weight: bold; color: #2b6cb0; margin-top: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
+  th, td { border: 1px solid #cbd5e0; padding: 8px 10px; text-align: right; }
+  th { background-color: #f7fafc; color: #2d3748; font-weight: bold; }
+  .clauses { list-style: decimal inside; padding-right: 0; margin-top: 10px; }
+  .clauses li { margin-bottom: 12px; text-align: justify; }
+  .signatures { display: flex; justify-content: space-between; margin-top: 60px; padding: 0 40px; }
+  .sig-block { text-align: center; width: 40%; }
+  .sig-block .label { font-weight: bold; margin-bottom: 50px; }
+  .sig-block .line { border-top: 1px solid #bbb; width: 100%; margin: 10px auto; }
+  .watermark { text-align: center; font-size: 10px; color: #a0aec0; margin-top: 40px; border-top: 1px dashed #e2e8f0; padding-top: 10px; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none; }
+    @page { size: A4; margin: 20mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print" style="background:#edf2f7; padding:10px; border-radius:6px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+  <span>طباعة عقد العمل مجهز للطباعة على ورق A4</span>
+  <button onclick="window.print()" style="background:#2b6cb0; color:white; border:none; padding:6px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">طباعة العقد (PDF)</button>
+</div>
+
+<div class="header">
+  <div class="header-right">
+    <strong>شركة مجموعة المقاولات والإعمار الموحدة</strong><br>
+    الرقم الضريبي الكلي للمنشأة<br>
+    شؤون الموظفين والعاملين بالشركة
+  </div>
+  <div>
+    <h2>عقد عمل موحد</h2>
+  </div>
+  <div class="header-left">
+    التاريخ: ${new Date().toLocaleDateString("ar-SA")}<br>
+    الرقم المرجعي: AW-EMP-${worker.id.slice(0, 5).toUpperCase()}<br>
+    حالة الملف: موثق نظامًا
+  </div>
+</div>
+
+<div class="contract-title">
+  <h1>عقد عمل محدد المدة</h1>
+</div>
+
+<p>أنه في يوم ${new Date().toLocaleDateString("ar-SA", { weekday: "long" })} الموافق ${new Date().toLocaleDateString("ar-SA")}م، تم الاتفاق والتعاقد بين كلاً من:</p>
+
+<p><strong>الطرف الأول:</strong> شركة المقاولات والتشييد الموحدة، ومقرها الرئيسي بالمملكة العربية السعودية، ويمثلها في التوقيع المدير عام.</p>
+<p><strong>الطرف الثاني:</strong> المكرم/المكرمة: <strong>${worker.name}</strong>، والمهنة: <strong>${worker.job}</strong>، ورقم الهوية/الإقامة: <strong>${worker.worker_id || "غير محدد"}</strong>، ورقم الجوال: <strong>${worker.phone || "غير محدد"}</strong>، ورقم الجواز: <strong>${contract.passport || "غير محدد"}</strong>.</p>
+
+<p>بموجب الأهلية والمشروعية لكلا الطرفين، فقد اتفقا وتراضيا على الشروط والبنود التالية:</p>
+
+<div class="section-title">البند الأول: طبيعة العمل والمباشرة</div>
+<p>يلتزم الطرف الثاني بموجب هذا العقد بالعمل لدى الطرف الأول بمهنة (<strong>${worker.job}</strong>) تحت إدارة وإشراف الطرف الأول، ويبدأ العمل بهذا العقد اعتباراً من تاريخ المباشرة الفعلي الموافق: <strong>${contract.start || worker.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}م</strong>.</p>
+
+<div class="section-title">البند الثاني: مدة العقد وفترة التجربة</div>
+<p>مدة هذا العقد (<strong>${contract.duration || "سنة واحدة"}</strong>) تبدأ من تاريخ مباشرة العمل الفعلي المذكور بالبند الأول. كما يخضع الطرف الثاني لفترة تجربة مدتها (<strong>${contract.probation || "90 يومًا"}</strong>) من تاريخ المباشرة الفعلي، ويحق للطرف الأول خلالها إنهاء العقد دون إنذار او مكافأة نهاية خدمة في حال عدم إثبات الكفاءة.</p>
+
+<div class="section-title">البند الثالث: المستحقات المالية والرواتب</div>
+<p>يلتزم الطرف الأول بدفع الأجر والبدلات المتفق عليها للطرف الثاني نهاية كل شهر ميلادي على النحو التالي:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>البيان والمسمى</th>
+      <th>القيمة والشرح</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>الراتب الأساسي الشهري</td>
+      <td><strong>${basicSalary > 0 ? basicSalary.toLocaleString() + " ريال سعودي" : "محتسب باليومية وبمستحقات مستمرة"}</strong></td>
+    </tr>
+    <tr>
+      <td>بدل السكن العيني/النقدي</td>
+      <td><strong>${housing > 0 ? housing.toLocaleString() + " ريال سعودي" : "مؤمن عينيًا أو غير مدرج"}</strong></td>
+    </tr>
+    <tr>
+      <td>بدل الانتقال الشهرى</td>
+      <td><strong>${transport > 0 ? transport.toLocaleString() + " ريال سعودي" : "مؤمن انتقال أو غير مدرج"}</strong></td>
+    </tr>
+    <tr>
+      <td>أية بدلات إضافية أخرى</td>
+      <td><strong>${other > 0 ? other.toLocaleString() + " ريال سعودي" : "لا يوجد"}</strong></td>
+    </tr>
+    <tr style="background:#f7fafc; font-weight:bold;">
+      <td>إجمالي الراتب والبدلات</td>
+      <td><strong>${totalSalary > 0 ? totalSalary.toLocaleString() + " ريال سعودي" : worker.daily > 0 ? "يومية محددة بـ: " + worker.daily + " ريال سعودي للعمل اليومي" : "غير محدد"}</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="section-title">البند الرابع: ساعات العمل والإجازة السنوية</div>
+<p>يخضع نظام ساعات العمل للوائح والأنظمة المعمول بها لدى المؤسسة وبما يتوافق مع نظام العمل السعودي بمعدل 8 ساعات عمل يوميًا. ويستحق الطرف الثاني إجازة سنوية مدفوعة الأجر مدتها (<strong>${contract.vacation || 30} يومًا</strong>) عن كل عام عمل كامل يلتزم بها الطرف الثاني بالتنسيق مع مديره المباشر.</p>
+
+<div class="section-title">البند الخامس: السرية والأمانة المهنية</div>
+<p>يتعهد الطرف الثاني بالولاء التام والحفاظ المطبق على الأسرار للمشاريع وخطط البناء الموكلة إليه، والالتزام بمعايير الأمن والسلامة المهنية في مواقع المشروعات المعينة له (العنوان الحالي: <strong>${worker.project || "فروع عامة"}</strong>).</p>
+
+<div class="section-title">البند السادس: التوقيع والإشهار</div>
+<p>حرر هذا العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل والامتثال بموجبها نظامًا.</p>
+
+<div class="signatures">
+  <div class="sig-block">
+    <div class="label">توقيع الطرف الأول (الشركة)</div>
+    <div style="height:35px"></div>
+    <div class="line"></div>
+    <span>الختم والتوقيع الإداري المالي</span>
+  </div>
+  <div class="sig-block">
+    <div class="label">توقيع الطرف الثاني (الموظف/العامل)</div>
+    <div style="height:35px"></div>
+    <div class="line"></div>
+    <span>بصمة الاسم والتوقيع الفعلي</span>
+  </div>
+</div>
+
+<div class="watermark">
+  مستند إلكتروني صادر ماليًا وإداريًا عن نظام الخزانة وإعمار الكتل التلقائي - رقم توثيق فرعي: SW-${worker.id.slice(0, 8)}
+</div>
+
+</body>
+</html>
+    `);
+    w.document.close();
   };
 
   // Users & Perms CRUD
@@ -1732,6 +2078,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                           <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black ${w.status === "على رأس العمل" ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-850 text-slate-400"}`}>{w.status}</span>
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
+                          <button onClick={() => initHrWorker(w)} className="p-1 text-amber-400 hover:text-amber-300 hover:scale-110 duration-200 inline-block" title="الشؤون والملف الوظيفي"><Users className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { setEditWorkerId(w.id); setWName(w.name || ""); setWId(w.worker_id || ""); setWPhone(w.phone || ""); setWJob(w.job || "عامل"); setWProject(w.project || ""); setWDaily(w.daily || ""); setWDays(w.days || ""); setWAdvance(w.advance !== undefined && w.advance !== null ? w.advance : 0); setWStatus(w.status || "على رأس العمل"); setWNotes(w.notes || ""); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("مسح العامل من قوائم الحساب؟")) { sb.from("workers").delete().eq("id", w.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
@@ -1740,6 +2087,325 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                   </tbody>
                 </table>
               </div>
+
+              {/* HR Profile Modal */}
+              {selectedWorkerForHr && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto p-6 space-y-6 text-right" dir="rtl">
+                    
+                    {/* Header */}
+                    <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+                      <div>
+                        <h3 className="text-lg font-black text-white flex items-center gap-2">
+                          <span className="text-xl">💼</span>
+                          <span>الملف التعريفي والشؤون الوظيفية: {selectedWorkerForHr.name}</span>
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-1">
+                          المهنة الحالية: <span className="text-amber-400 font-bold">{selectedWorkerForHr.job}</span> • 
+                          رقم الهوية/الإقامة: <span className="text-slate-200 font-mono">{selectedWorkerForHr.worker_id || "غير مسجل"}</span> • 
+                          المشروع: <span className="text-amber-500 font-bold">{selectedWorkerForHr.project || "عام"}</span>
+                        </p>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setSelectedWorkerForHr(null)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-rose-950/45 hover:text-rose-405 text-xs font-bold rounded-lg transition-colors border border-slate-750"
+                      >
+                        إغلاق ❌
+                      </button>
+                    </div>
+
+                    {/* Main Content Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                      {/* 1. Employment Contract Panel */}
+                      <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-4">
+                        <div className="border-b border-slate-800 pb-2 flex justify-between items-center">
+                          <h4 className="text-xs font-black text-amber-400 flex items-center gap-1">📋 <span>عقد وجاهزية الموظف</span></h4>
+                          <button 
+                            type="button"
+                            onClick={() => onPrintWorkerContract(selectedWorkerForHr)}
+                            className="px-2.5 py-1 bg-amber-500 text-slate-950 hover:bg-amber-400 text-[10px] font-black rounded-md flex items-center gap-1 transition-all"
+                          >
+                            <span>🖨️</span> طباعة العقد الموحد
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">تاريخ البداية (المباشرة)</label>
+                            <input 
+                              type="date" 
+                              value={cStart} 
+                              onChange={(e) => setCStart(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none font-sans" 
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">مدة التعاقد</label>
+                            <input 
+                              type="text" 
+                              placeholder="مثلاً: سنة واحدة / سنتين" 
+                              value={cDuration} 
+                              onChange={(e) => setCDuration(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" 
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">الراتب الأساسي (شهري)</label>
+                            <input 
+                              type="number" 
+                              placeholder="0" 
+                              value={cSalary} 
+                              onChange={(e) => setCSalary(e.target.value ? Number(e.target.value) : "")} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-sans text-white focus:outline-none" 
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">بدل السكن</label>
+                              <input 
+                                type="number" 
+                                placeholder="0" 
+                                value={cHousing} 
+                                onChange={(e) => setCHousing(e.target.value ? Number(e.target.value) : "")} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-sans text-white focus:outline-none font-sans" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">بدل انتقال</label>
+                              <input 
+                                type="number" 
+                                placeholder="0" 
+                                value={cTransport} 
+                                onChange={(e) => setCTransport(e.target.value ? Number(e.target.value) : "")} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-sans text-white focus:outline-none font-sans" 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">بدلات أخرى</label>
+                            <input 
+                              type="number" 
+                              placeholder="0" 
+                              value={cOther} 
+                              onChange={(e) => setCOther(e.target.value ? Number(e.target.value) : "")} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-sans text-white focus:outline-none font-sans" 
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">رقم جواز السفر</label>
+                            <input 
+                              type="text" 
+                              placeholder="K123456" 
+                              value={cPassport} 
+                              onChange={(e) => setCPassport(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none font-mono" 
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">فترة التجربة</label>
+                              <input 
+                                type="text" 
+                                placeholder="90 يوم" 
+                                value={cProbation} 
+                                onChange={(e) => setCProbation(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">الإجازة السنوية (يوم)</label>
+                              <input 
+                                type="number" 
+                                placeholder="30" 
+                                value={cVacation} 
+                                onChange={(e) => setCVacation(e.target.value ? Number(e.target.value) : "")} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" 
+                              />
+                            </div>
+                          </div>
+
+                          <button 
+                            type="button" 
+                            onClick={saveWorkerContractLogic}
+                            className="w-full py-2 bg-amber-500 text-slate-950 rounded-lg text-xs font-black transition-all mt-4"
+                          >
+                            💾 حفظ بنود عقد العمل
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 2. Advance Management Panel */}
+                      <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-4">
+                        <div className="border-b border-slate-800 pb-2">
+                          <h4 className="text-xs font-black text-rose-400 flex items-center gap-1 font-sans">💸 <span>إصدار وصرف سلفة مالية عاجلة</span></h4>
+                        </div>
+
+                        <form onSubmit={addWorkerAdvanceLogic} className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">قيمة السلفة المستحقة (ريال)</label>
+                            <input 
+                              type="number" 
+                              required
+                              placeholder="0" 
+                              value={advAmount} 
+                              onChange={(e) => setAdvAmount(e.target.value ? Number(e.target.value) : "")} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-sans text-white focus:outline-none focus:border-rose-500 font-sans" 
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">صرف مالي من الخزنة</label>
+                            <select 
+                              value={advTreasury} 
+                              onChange={(e) => setAdvTreasury(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-white focus:outline-none cursor-pointer text-slate-950 bg-white"
+                            >
+                              {getStoredTreasuries().map((tName) => (
+                                <option key={tName} value={tName} className="text-slate-950">💰 {tName}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">تاريخ المعاملة</label>
+                            <input 
+                              type="date" 
+                              required
+                              value={advDate} 
+                              onChange={(e) => setAdvDate(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none font-sans" 
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">تفاصيل إضافية / بيان الصرف</label>
+                            <textarea 
+                              placeholder="تكتب هنا ملاحظات السند..." 
+                              value={advNotes} 
+                              onChange={(e) => setAdvNotes(e.target.value)} 
+                              className="w-full px-2.5 py-2 h-20 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-rose-500 resize-none font-sans" 
+                            />
+                          </div>
+
+                          <button 
+                            type="submit" 
+                            className="w-full py-2 bg-rose-500 hover:bg-rose-400 text-white rounded-lg text-xs font-black transition-all mt-4"
+                          >
+                            ➕ اعتماد وصرف السلفة الحالية
+                          </button>
+                        </form>
+
+                        <div className="pt-2 border-t border-slate-800">
+                          <label className="text-[10px] text-slate-400 block font-bold">الوضعية المالية للموظف بالملفات</label>
+                          <div className="grid grid-cols-2 gap-2 mt-1.5">
+                            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-center">
+                              <span className="block text-[9px] text-slate-400">إجمالي السلف العهدة</span>
+                              <span className="block text-xs font-black text-rose-450 text-rose-400 mt-0.5">{Number(selectedWorkerForHr.advance || 0).toLocaleString()} ريال</span>
+                            </div>
+                            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-center font-sans">
+                              <span className="block text-[9px] text-slate-400 font-sans">المتبقي الجاري للاستلام</span>
+                              <span className="block text-xs font-black text-emerald-400 mt-0.5">{(selectedWorkerForHr.total - selectedWorkerForHr.advance).toLocaleString()} ريال</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Leave Requests Panel */}
+                      <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-850 space-y-4">
+                        <div className="border-b border-slate-800 pb-2">
+                          <h4 className="text-xs font-black text-emerald-400 flex items-center gap-1">🏖️ <span>إجازات الموظف وتعطيل المباشرة</span></h4>
+                        </div>
+
+                        <form onSubmit={addWorkerLeaveLogic} className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">تاريخ البداية</label>
+                              <input 
+                                type="date" 
+                                required
+                                value={lhStart} 
+                                onChange={(e) => setLhStart(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-sans" 
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold">تاريخ النهاية</label>
+                              <input 
+                                type="date" 
+                                required
+                                value={lhEnd} 
+                                onChange={(e) => setLhEnd(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-sans" 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">نوع الإجازة المطلوبة</label>
+                            <select 
+                              value={lhType} 
+                              onChange={(e) => setLhType(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-white focus:outline-none cursor-pointer text-slate-950 bg-white"
+                            >
+                              <option value="إجازة اعتيادية" className="text-slate-950">إجازة اعتيادية سنوية</option>
+                              <option value="إجازة مرضية" className="text-slate-950">إجازة مرضية موثقة</option>
+                              <option value="إجازة اضطرارية" className="text-slate-950">إجازة اضطرارية طارئة</option>
+                              <option value="دون راتب" className="text-slate-950">إجازة دون راتب</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-400 font-bold">توضيحات أخرى</label>
+                            <input 
+                              type="text" 
+                              placeholder="سبب أو ملاحظة..." 
+                              value={lhNotes} 
+                              onChange={(e) => setLhNotes(e.target.value)} 
+                              className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-sans" 
+                            />
+                          </div>
+
+                          <button 
+                            type="submit" 
+                            className="w-full py-2 bg-emerald-500 hover:bg-emerald-450 text-slate-950 rounded-lg text-xs font-black transition-all mt-4"
+                          >
+                            🏖️ تسجيل طلب إجازة معتمد
+                          </button>
+                        </form>
+
+                        {/* Leave History List */}
+                        <div className="pt-2 border-t border-slate-800">
+                          <label className="text-[10px] text-slate-400 block font-bold mb-1.5">الإجازات السابقة المسجلة ({awExtractWorkerLeaves(selectedWorkerForHr.notes || "").length})</label>
+                          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                            {awExtractWorkerLeaves(selectedWorkerForHr.notes || "").length === 0 ? (
+                              <span className="text-[10px] text-slate-500 block text-center py-2 bg-slate-950 rounded-xl font-sans font-sans">لا توجد إجازات سابقة مسجلة للموظف بعد.</span>
+                            ) : (
+                              awExtractWorkerLeaves(selectedWorkerForHr.notes || "").map((l, lIdx) => (
+                                <div key={lIdx} className="bg-slate-900/85 p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300 font-sans">
+                                  <div className="flex justify-between font-black text-[10px] text-emerald-400 font-sans">
+                                    <span>{l.type}</span>
+                                    <span className="text-[9px] text-slate-400">من {l.start} إلى {l.end}</span>
+                                  </div>
+                                  {l.notes && <p className="text-[10px] text-slate-400 mt-1 truncate font-sans">{l.notes}</p>}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

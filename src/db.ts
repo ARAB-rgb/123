@@ -182,3 +182,79 @@ export async function logSession(user: User, action: string) {
     action
   });
 }
+
+// Worker Profile tag extraction & builders
+export function awCleanWorkerNotes(notes: string): string {
+  return String(notes || "")
+    .replace(/\s*\[عقد_[^\]]+\]\s*/g, " ")
+    .replace(/\s*\[طلب_إجازة:\s*[^\]]+\]\s*/g, " ")
+    .trim();
+}
+
+export function awExtractWorkerContract(notes: string): any {
+  const text = String(notes || "");
+  const getVal = (key: string, def = "") => {
+    const rx = new RegExp(`\\[${key}:\\s*([^\\]]+)\\]`);
+    const m = text.match(rx);
+    return m ? m[1].trim() : def;
+  };
+  const getNum = (key: string, def = 0) => {
+    const val = getVal(key);
+    return val ? Number(val) : def;
+  };
+
+  return {
+    start: getVal("عقد_البداية", ""),
+    duration: getVal("عقد_المدة", "سنة واحدة"),
+    salary: getNum("عقد_الراتب", 0),
+    housing: getNum("عقد_السكن", 0),
+    transport: getNum("عقد_الانتقال", 0),
+    other: getNum("عقد_أخرى", 0),
+    passport: getVal("عقد_جواز", ""),
+    probation: getVal("عقد_التجربة", "90 يوم"),
+    vacation: getNum("عقد_الإجازة", 30),
+  };
+}
+
+export function awExtractWorkerLeaves(notes: string): any[] {
+  const text = String(notes || "");
+  const leaves: any[] = [];
+  const matches = text.matchAll(/\[طلب_إجازة:\s*([^\]]+)\]/g);
+  for (const m of matches) {
+    const parts = m[1].split("|");
+    if (parts.length >= 4) {
+      leaves.push({
+        id: parts[0]?.trim() || "",
+        start: parts[1]?.trim() || "",
+        end: parts[2]?.trim() || "",
+        type: parts[3]?.trim() || "",
+        notes: parts[4]?.trim() || "",
+      });
+    }
+  }
+  return leaves;
+}
+
+export function awBuildWorkerNotes(cleanText: string, contract: any, leaves: any[]): string {
+  const notesText = awCleanWorkerNotes(cleanText);
+  const tags: string[] = [];
+  if (contract) {
+    if (contract.start) tags.push(`[عقد_البداية: ${contract.start}]`);
+    if (contract.duration) tags.push(`[عقد_المدة: ${contract.duration}]`);
+    if (contract.salary) tags.push(`[عقد_الراتب: ${contract.salary}]`);
+    if (contract.housing) tags.push(`[عقد_السكن: ${contract.housing}]`);
+    if (contract.transport) tags.push(`[عقد_الانتقال: ${contract.transport}]`);
+    if (contract.other) tags.push(`[عقد_أخرى: ${contract.other}]`);
+    if (contract.passport) tags.push(`[عقد_جواز: ${contract.passport}]`);
+    if (contract.probation) tags.push(`[عقد_التجربة: ${contract.probation}]`);
+    if (contract.vacation) tags.push(`[عقد_الإجازة: ${contract.vacation}]`);
+  }
+  if (leaves && leaves.length > 0) {
+    leaves.forEach(l => {
+      tags.push(`[طلب_إجازة: ${l.id || Math.random().toString(36).substring(7)}|${l.start}|${l.end}|${l.type}|${l.notes}]`);
+    });
+  }
+
+  if (tags.length === 0) return notesText;
+  return tags.join(" ") + (notesText ? "\n" : "") + notesText;
+}
