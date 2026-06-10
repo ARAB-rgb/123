@@ -181,6 +181,7 @@ export default function App() {
   const [uName, setUName] = useState("");
   const [uCode, setUCode] = useState("");
   const [uPass, setUPass] = useState("");
+  const [uWorkerId, setUWorkerId] = useState("");
   const [uRole, setURole] = useState<"admin" | "employee">("employee");
   const [uRegion, setURegion] = useState("");
   const [uPerms, setUPerms] = useState<Record<string, boolean>>({
@@ -1206,6 +1207,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       perms: {
         ...uPerms,
         region: uRegion,
+        worker_id: uWorkerId.trim() || null,
       },
     };
 
@@ -1226,6 +1228,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       setUName("");
       setUCode("");
       setUPass("");
+      setUWorkerId("");
       setURegion("");
       setURole("employee");
       setUPerms({
@@ -2416,22 +2419,119 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                 <div className="border-b border-slate-850 pb-3">
                   <h3 className="text-base font-black text-white flex items-center gap-2"><span>👤</span> تهيئة الصلاحيات الإدارية وربط حساب الموظفين</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <input required placeholder="اسم الموظف" value={uName} onChange={(e) => setUName(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input required placeholder="كود تسجيل الدخول" value={uCode} onChange={(e) => setUCode(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input required placeholder="كلمة المرور المالية" value={uPass} onChange={(e) => setUPass(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <select value={uRole} onChange={(e: any) => setURole(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none">
-                    <option value="employee">موظف فرع محدود</option>
-                    <option value="admin">أدمن مكتب عام</option>
-                  </select>
-                  <select value={uRegion} onChange={(e) => setURegion(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none">
-                    <option value="">كل الإدارات والفروع</option>
-                    <option value="الوسطى">الوسطى</option>
-                    <option value="الشرقية">الشرقية</option>
-                    <option value="الغربية">الغربية</option>
-                    <option value="الجنوب">الجنوب</option>
-                    <option value="الشمال">الشمال</option>
-                  </select>
+                {/* Card Linking Wrapper */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 rtl" dir="rtl">
+                  {/* Card Section 1: DB Worker Match */}
+                  <div className="bg-slate-950/30 p-4 rounded-2xl border border-slate-800/80 space-y-3.5">
+                    <h4 className="text-xs font-black text-amber-500 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                      <span>💳</span>
+                      <span>الربط بملف الموظف و الـ ID</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] text-slate-400 font-black block">ربط الحساب بملف عامل / موظف حالي (اختياري)</label>
+                        <select
+                          value={workers.find((w) => w.worker_id === uWorkerId)?.worker_id || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const selectedW = workers.find((w) => w.worker_id === val);
+                            if (selectedW) {
+                              setUWorkerId(selectedW.worker_id || "");
+                              setUName(selectedW.name || "");
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none text-slate-950 bg-white"
+                        >
+                          <option value="" className="text-slate-950">-- غير مربوط بملف عامل (إدخال يدوي) --</option>
+                          {workers.map((w) => (
+                            <option key={w.id} value={w.worker_id} className="text-slate-950">
+                              👷 {w.name} - {w.job} {w.worker_id ? `(${w.worker_id})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">الرقم الوظيفي / ID الموظف</label>
+                        <input
+                          placeholder="أدخل الرقم الوظيفي يدويًا"
+                          value={uWorkerId}
+                          onChange={(e) => setUWorkerId(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none placeholder-slate-500 font-sans"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">اسم الموظف الفعلي</label>
+                        <input
+                          required
+                          placeholder="الاسم الكامل للموظف"
+                          value={uName}
+                          onChange={(e) => setUName(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Section 2: Account Login Details */}
+                  <div className="bg-slate-950/30 p-4 rounded-2xl border border-slate-800/80 space-y-3.5">
+                    <h4 className="text-xs font-black text-indigo-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                      <span>🔑</span>
+                      <span>بيانات الدخول ونطاق الفرع</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">كود تسجيل الدخول (اسم المستخدم)</label>
+                        <input
+                          required
+                          placeholder="مثلاً: user_riyadh"
+                          value={uCode}
+                          onChange={(e) => setUCode(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">كلمة المرور / الرمز الخاص</label>
+                        <input
+                          required
+                          placeholder="كلمة المرور للدخول"
+                          value={uPass}
+                          onChange={(e) => setUPass(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">تصنيف الصلاحيات العام</label>
+                        <select
+                          value={uRole}
+                          onChange={(e: any) => setURole(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none text-slate-950 bg-white"
+                        >
+                          <option value="employee" className="text-slate-950">👨‍💼 موظف فرع محدود</option>
+                          <option value="admin" className="text-slate-950">👑 أدمن مكتب عام</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-black block">النطاق الإداري / المنطقة</label>
+                        <select
+                          value={uRegion}
+                          onChange={(e) => setURegion(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none text-slate-950 bg-white"
+                        >
+                          <option value="" className="text-slate-950">🇸🇦 كل الإدارات والفروع</option>
+                          <option value="الوسطى" className="text-slate-950">📍 الوسطى</option>
+                          <option value="الشرقية" className="text-slate-950">📍 الشرقية</option>
+                          <option value="الغربية" className="text-slate-950">📍 الغربية</option>
+                          <option value="الجنوب" className="text-slate-950">📍 الجنوب</option>
+                          <option value="الشمال" className="text-slate-950">📍 الشمال</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Submitting check lists for individual permissions inside erp */}
@@ -2470,7 +2570,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
 
                 <div className="flex gap-2 justify-end">
                   {editUserId && (
-                    <button type="button" onClick={() => { setEditUserId(null); setUName(""); setUCode(""); setUPass(""); setURegion(""); setURole("employee"); }} className="px-5 py-2.5 bg-slate-800 rounded-xl text-xs font-black">إلغاء</button>
+                    <button type="button" onClick={() => { setEditUserId(null); setUName(""); setUCode(""); setUPass(""); setUWorkerId(""); setURegion(""); setURole("employee"); }} className="px-5 py-2.5 bg-slate-800 rounded-xl text-xs font-black">إلغاء</button>
                   )}
                   <button type="submit" className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black">حفظ وإرسال الصلاحية للموظف</button>
                 </div>
@@ -2490,12 +2590,20 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                   <tbody>
                     {users.map((u, idx) => {
                       const permissionsObj = u.perms || {};
-                      const names = Object.keys(permissionsObj).filter((k) => k !== "region" && permissionsObj[k]);
+                      const names = Object.keys(permissionsObj).filter((k) => k !== "region" && k !== "worker_id" && permissionsObj[k]);
+                      const effectiveWorkerId = permissionsObj.worker_id || u.worker_id;
                       return (
                         <tr key={idx} className="border-b border-slate-850 hover:bg-slate-800/10 transition-colors">
                           <td className="py-3 px-3">
                             <span className="block font-black text-white">{u.name}</span>
-                            <span className="block text-[10px] text-amber-500 select-all font-mono font-bold">كود الموظف: {u.code}</span>
+                            <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-start sm:items-center mt-0.5">
+                              <span className="block text-[10px] text-amber-500 select-all font-mono font-bold">كود الموظف: {u.code}</span>
+                              {effectiveWorkerId && (
+                                <span className="block text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                  🪪 الرقم الوظيفي: {effectiveWorkerId}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3">
                             <span className="px-2.5 py-0.5 rounded text-[10px] bg-slate-800 text-amber-400 font-bold border border-slate-700">{u.role === "admin" ? "أدمن مكتب عام" : "موظف فرع"}</span>
@@ -2511,6 +2619,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                                 setUName(u.name || "");
                                 setUCode(u.code || "");
                                 setUPass(u.password || "");
+                                setUWorkerId(effectiveWorkerId || "");
                                 setURole(u.role || "employee");
                                 setURegion(permissionsObj.region || "");
                                 setUPerms({

@@ -34,6 +34,7 @@ export interface User {
   password?: string;
   role: "admin" | "employee";
   perms: UserPerms;
+  worker_id?: string;
   created_at?: string;
 }
 
