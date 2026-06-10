@@ -267,7 +267,8 @@ export default function App() {
         sb.from("sessions").select("*").order("created_at", { ascending: false }),
       ]);
 
-      setUsers(u.data || []);
+      const uList = u.data || [];
+      setUsers(uList);
       setInstallments(inst.data || []);
       setQuotes(q.data || []);
       setReceipts(rec.data || []);
@@ -276,6 +277,13 @@ export default function App() {
       setProjects(pr.data || []);
       setWorkers(w.data || []);
       setSessions(s.data || []);
+
+      // Autoresolve/refresh current user details to update links/permissions dynamically
+      const freshUser = uList.find((x) => x.id === currentUser?.id);
+      if (freshUser) {
+        setCurrentUser(freshUser);
+        localStorage.setItem("aw_current_user", JSON.stringify(freshUser));
+      }
     } catch {
       showToast("تنبيه: فشل في الاتصال بقاعدة البيانات", "error");
     }
@@ -891,8 +899,11 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
     setCProbation(contract.probation || "90 يوم");
     setCVacation(contract.vacation || 30);
 
-    // Scan for linked user account
-    const linkedUser = users.find(u => (u.perms?.worker_id === w.worker_id && w.worker_id) || (u.worker_id === w.worker_id && w.worker_id));
+    // Scan for linked user account checking both custom worker_id and physical database id
+    const linkedUser = users.find(u => 
+      (w.worker_id && (u.perms?.worker_id === w.worker_id || u.worker_id === w.worker_id)) || 
+      (u.perms?.worker_id === w.id || u.worker_id === w.id)
+    );
     setCUserId(linkedUser ? linkedUser.id : "");
 
     // Clear/init leave forms
@@ -943,14 +954,20 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
         }
 
         // Unlink previous user accounts
-        const otherLinked = users.filter(u => u.id !== cUserId && (u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id));
+        const otherLinked = users.filter(u => u.id !== cUserId && (
+          (selectedWorkerForHr.worker_id && (u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id)) ||
+          (u.perms?.worker_id === selectedWorkerForHr.id || u.worker_id === selectedWorkerForHr.id)
+        ));
         for (const ou of otherLinked) {
           const cleanedPerms = { ...(ou.perms || {}) };
           delete cleanedPerms.worker_id;
           await sb.from("users").update({ perms: cleanedPerms }).eq("id", ou.id);
         }
       } else {
-        const currentlyLinked = users.filter(u => u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id);
+        const currentlyLinked = users.filter(u => 
+          (selectedWorkerForHr.worker_id && (u.perms?.worker_id === selectedWorkerForHr.worker_id || u.worker_id === selectedWorkerForHr.worker_id)) ||
+          (u.perms?.worker_id === selectedWorkerForHr.id || u.worker_id === selectedWorkerForHr.id)
+        );
         for (const clu of currentlyLinked) {
           const cleanedPerms = { ...(clu.perms || {}) };
           delete cleanedPerms.worker_id;
