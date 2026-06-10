@@ -85,6 +85,7 @@ export default function App() {
   const [editProjectId, setEditProjectId] = useState<string | null>(null);
   const [editWorkerId, setEditWorkerId] = useState<string | null>(null);
   const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [selfSelectedWorkerId, setSelfSelectedWorkerId] = useState<string>("");
 
   // Forms Hooks
   // 1. Quotes Forms
@@ -1040,6 +1041,101 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
     }
   };
 
+  const addSelfWorkerLeaveLogic = async (e: React.FormEvent, targetWorker: Worker) => {
+    e.preventDefault();
+    if (!targetWorker || !lhStart || !lhEnd) return;
+    setIsLoading(true);
+    try {
+      const newLeave = {
+        id: Math.random().toString(36).substring(7),
+        start: lhStart,
+        end: lhEnd,
+        type: lhType,
+        notes: lhNotes.trim()
+      };
+      const existingLeaves = awExtractWorkerLeaves(targetWorker.notes || "");
+      const finalLeaves = [...existingLeaves, newLeave];
+
+      const contractObj = awExtractWorkerContract(targetWorker.notes || "");
+      const rawNotes = awCleanWorkerNotes(targetWorker.notes || "");
+      const finalNotes = awBuildWorkerNotes(rawNotes, contractObj, finalLeaves);
+
+      const { error } = await sb.from("workers").update({
+        notes: finalNotes,
+        status: "إجازة"
+      }).eq("id", targetWorker.id);
+
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
+
+      await logSession(currentUser!, `تسجيل طلب إجازة خدمة ذاتية (${lhType}) للموظف: ${targetWorker.name}`);
+      showToast("تم تسجيل طلب الإجازة بنجاح وتحديث وضعية ملفك الوظيفي.");
+      
+      setLhEnd("");
+      setLhNotes("");
+      await loadEverything();
+    } catch {
+      showToast("حدث خلل أثناء تسجيل طلب الإجازة", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addSelfWorkerAdvanceLogic = async (e: React.FormEvent, targetWorker: Worker) => {
+    e.preventDefault();
+    if (!targetWorker || !advAmount) return;
+    setIsLoading(true);
+    try {
+      const amt = Number(advAmount);
+      const payRow = {
+        no: generateNextNo("AW-PAY", payments, "no"),
+        to_name: `سلفة الموظف: ${targetWorker.name}`,
+        amount: amt,
+        method: "نقدي",
+        date: advDate,
+        project: targetWorker.project || "عام",
+        notes: awBuildNotesWithRegionAndTreasury(
+          `طلب سلفة موظف (خدمة ذاتية/ربط مباشر). ${advNotes}`.trim(),
+          targetWorker.project ? "" : (currentUser?.perms?.region || ""),
+          advTreasury
+        ),
+      };
+
+      const { error: payErr } = await sb.from("payments").insert(payRow);
+      if (payErr) {
+        showToast(payErr.message, "error");
+        return;
+      }
+
+      const currentAdvance = Number(targetWorker.advance || 0);
+      const newAdvance = currentAdvance + amt;
+      const tot = Number(targetWorker.daily || 0) * Number(targetWorker.days || 0);
+      const newBalance = Math.max(0, tot - newAdvance);
+
+      const { error: workerErr } = await sb.from("workers").update({
+        advance: newAdvance,
+        balance: newBalance
+      }).eq("id", targetWorker.id);
+
+      if (workerErr) {
+        showToast(workerErr.message, "error");
+        return;
+      }
+
+      await logSession(currentUser!, `طلب وصرف سلفة مالية ذاتية بقيمة ${amt} ريال للموظف: ${targetWorker.name}`);
+      showToast("تم اعتماد وصرف السلفة المالية بنجاح للخدمة الذاتية وتحديث الأرصدة.");
+      setAdvAmount("");
+      setAdvNotes("");
+      await loadEverything();
+    } catch {
+      showToast("حدث خطأ أثناء صرف السلفة", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const onPrintWorkerContract = (worker: Worker) => {
     const contract = awExtractWorkerContract(worker.notes || "");
     const basicSalary = Number(contract.salary || 0);
@@ -1316,6 +1412,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
   // Nav categories helpers
   const navigationItems = [
     { key: "dashboard", label: "الرئيسية", icon: Home, visible: true },
+    { key: "my_profile", label: "ملفي الوظيفي والخدمات الذاتية", icon: User, visible: true },
     { key: "installments", label: "التقسيط والعقود", icon: ClipboardList, visible: can("installmentsView") },
     { key: "quotes", label: "عروض الأسعار", icon: FileText, visible: can("quotes") },
     { key: "receipts", label: "سند قبض", icon: Landmark, visible: can("receipts") },
@@ -2640,6 +2737,360 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* My Profile and Self-Service Section */}
+          {activeSection === "my_profile" && (
+            <div className="space-y-6" dir="rtl">
+              {/* Top Selector (for admins or test purpose, or feedback) */}
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-850 pb-3">
+                  <div>
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      <span>👤</span>
+                      <span>ملفي الوظيفي والخدمات والطلبات الذاتية</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-1">الاطلاع الذاتي المباشر على بنود العقد، تسجيل الإجازات الذاتية، ومتابعة الأرصدة وطلب السلف المالية العاجلة.</p>
+                  </div>
+                  
+                  {/* Dropdown for testing or changing scope */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400 font-bold shrink-0">ملف الموظف المعين:</span>
+                    <select
+                      value={selfSelectedWorkerId || workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id || ""}
+                      onChange={(e) => setSelfSelectedWorkerId(e.target.value)}
+                      className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-amber-400 focus:outline-none cursor-pointer max-w-xs text-slate-950 bg-white"
+                    >
+                      <option value="" className="text-slate-950">--- اختر ملف موظف للتصفح الجاري ---</option>
+                      {workers.map((w) => (
+                        <option key={w.id} value={w.id} className="text-slate-950">
+                          👷 {w.name} - {w.job} ({w.worker_id || "دون ID"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Main Logic: Retrieve profile worker */}
+                {(() => {
+                  const targetWorkerId = selfSelectedWorkerId || workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id;
+                  const profileWorker = workers.find((w) => w.id === targetWorkerId);
+
+                  if (!profileWorker) {
+                    return (
+                      <div className="p-8 text-center bg-slate-950/20 border border-slate-800 rounded-2xl space-y-3">
+                        <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto animate-bounce" />
+                        <h4 className="text-sm font-black text-white">لم يتم ربط هذا الحساب بملف عامل حالي في شجرة الموارد البشرية بعد!</h4>
+                        <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
+                          يرجى مراجعة إدارة الموارد البشرية أو أدمن النظام لربط حسابك الحالي (<strong>{currentUser?.name}</strong>) بـ <strong>الرقم الوظيفي / ID الهوية</strong> الصحيح من لوحة الموظفين والصلاحية.
+                        </p>
+                        {currentUser?.role === "admin" && (
+                          <div className="pt-2 text-xs text-amber-400 font-bold">
+                            💡 بصفتك مسؤولاً عامًا (أدمن)، يمكنك تصفح أي ملف آخر باستخدام قائمة الاختيار في الأعلى للتجربة والتحقق المباشر!
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const contract = awExtractWorkerContract(profileWorker.notes || "");
+                  const leavesList = awExtractWorkerLeaves(profileWorker.notes || "");
+                  const basicSalary = Number(contract.salary || 0);
+                  const housing = Number(contract.housing || 0);
+                  const transport = Number(contract.transport || 0);
+                  const other = Number(contract.other || 0);
+                  const totalMonthlySalary = basicSalary + housing + transport + other;
+                  
+                  // Financial summaries
+                  const workedDays = Number(profileWorker.days || 0);
+                  const dailyWage = Number(profileWorker.daily || 0);
+                  const earnedAccumulated = dailyWage * workedDays;
+                  const totalAdvanceDeducted = Number(profileWorker.advance || 0);
+                  const netSalaryBalance = profileWorker.balance;
+
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      
+                      {/* Column 1: Contract & Career Profile */}
+                      <div className="lg:col-span-1 space-y-6">
+                        {/* Profile Info Card */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-md">
+                              <span className="text-2xl">👷</span>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-black text-white leading-tight">{profileWorker.name}</h4>
+                              <p className="text-[10px] text-amber-400 mt-1 font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 inline-block">
+                                {profileWorker.job} • {profileWorker.status}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="divide-y divide-slate-850/80 text-xs text-slate-300">
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">رقم الهوية الإقامة:</span>
+                              <span className="text-white font-semibold font-mono">{profileWorker.worker_id || "غير مسجل"}</span>
+                            </div>
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">رقم الجوال:</span>
+                              <span className="text-white font-semibold font-mono">{profileWorker.phone || "---"}</span>
+                            </div>
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">المشروع الحالي:</span>
+                              <span className="text-white font-semibold">{profileWorker.project || "عام"}</span>
+                            </div>
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">تاريخ الالتحاق بالعمل:</span>
+                              <span className="text-white font-semibold font-sans">{contract.start || "غير محدد"}</span>
+                            </div>
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">فترة تجربة العقد:</span>
+                              <span className="text-white font-semibold font-sans">{contract.probation || "90 يوم"}</span>
+                            </div>
+                            <div className="py-2 flex justify-between">
+                              <span className="text-slate-400 font-bold">رقم جواز السفر:</span>
+                              <span className="text-white font-semibold font-mono">{contract.passport || "---"}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Salary and Compensation details */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-xs font-black text-emerald-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                            <span>💸</span>
+                            <span>تفاصيل الراتب ومزايا العقد الأساسية</span>
+                          </h4>
+
+                          <div className="grid grid-cols-2 gap-3 text-right">
+                            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-850 text-right">
+                              <span className="text-[10px] text-slate-400 block font-bold">الراتب الأساسي</span>
+                              <span className="text-sm font-black text-white block mt-0.5 font-mono">{basicSalary.toLocaleString()} <span className="text-[9px] text-slate-400">ريال</span></span>
+                            </div>
+                            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-850 text-right">
+                              <span className="text-[10px] text-slate-400 block font-bold">بدل السكن شهريًا</span>
+                              <span className="text-sm font-black text-slate-200 block mt-0.5 font-mono">{housing.toLocaleString()} <span className="text-[9px] text-slate-400">ريال</span></span>
+                            </div>
+                            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-850 text-right">
+                              <span className="text-[10px] text-slate-400 block font-bold">بدل الانتقالات</span>
+                              <span className="text-sm font-black text-slate-200 block mt-0.5 font-mono">{transport.toLocaleString()} <span className="text-[9px] text-slate-400">ريال</span></span>
+                            </div>
+                            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-850 text-right">
+                              <span className="text-[10px] text-slate-400 block font-bold">بدلات أخرى وعوض</span>
+                              <span className="text-sm font-black text-slate-200 block mt-0.5 font-mono">{other.toLocaleString()} <span className="text-[9px] text-slate-400">ريال</span></span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-gradient-to-l from-emerald-500/10 to-transparent border border-emerald-500/15 rounded-xl">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-emerald-300 font-bold">إجمالي الراتب الشهري الشامل:</span>
+                              <span className="text-base font-black text-emerald-400 font-mono">{totalMonthlySalary.toLocaleString()} ريال</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Column 2: Advance Payments / Loans Requests */}
+                      <div className="lg:col-span-1 space-y-6">
+                        {/* Financial Account and Sulafe Balance */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-xs font-black text-indigo-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                            <span>🏛️</span>
+                            <span>الرصيد المالي الحالي وتفاصيل السلفيات</span>
+                          </h4>
+
+                          <div className="space-y-2.5 text-xs text-slate-300">
+                            <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center">
+                              <span className="text-slate-400 font-bold">أيام العمل الجارية المسجلة:</span>
+                              <span className="text-white font-black font-mono">{workedDays} أيام</span>
+                            </div>
+                            <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center">
+                              <span className="text-slate-400 font-bold">أجر اليومية في الموقع المعين:</span>
+                              <span className="text-white font-black font-mono">{dailyWage.toLocaleString()} ريال/يوم</span>
+                            </div>
+                            <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center">
+                              <span className="text-slate-400 font-bold">إجمالي المتراكم المستحق:</span>
+                              <span className="text-amber-400 font-black font-mono">{earnedAccumulated.toLocaleString()} ريال</span>
+                            </div>
+                            <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center border border-rose-500/20">
+                              <span className="text-rose-400 font-bold">إجمالي السلفيات المسحوبة:</span>
+                              <span className="text-rose-400 font-black font-mono">-{totalAdvanceDeducted.toLocaleString()} ريال</span>
+                            </div>
+                            <div className="p-3 bg-indigo-500/10 rounded-xl flex justify-between items-center border border-indigo-500/25">
+                              <span className="text-indigo-300 font-black text-xs">صافي المستحق المعلق (الرصيد المتاح):</span>
+                              <span className="text-base font-black text-indigo-400 font-mono">{netSalaryBalance.toLocaleString()} ريال</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Request Sulafe Form */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-xs font-black text-pink-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                            <span>✍️</span>
+                            <span>تقديم طلب سلفة مالية عاجلة (صرف مباشر)</span>
+                          </h4>
+
+                          <form onSubmit={(e) => addSelfWorkerAdvanceLogic(e, profileWorker)} className="space-y-3.5">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">مبلغ السلفة المطلوب (ريال)</label>
+                              <input 
+                                type="number" 
+                                required
+                                placeholder="0" 
+                                value={advAmount} 
+                                onChange={(e) => setAdvAmount(e.target.value ? Number(e.target.value) : "")} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-rose-500" 
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">صرف السند ماليًا من صندوق</label>
+                              <select 
+                                value={advTreasury} 
+                                onChange={(e) => setAdvTreasury(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-white focus:outline-none cursor-pointer text-slate-950 bg-white"
+                              >
+                                {getStoredTreasuries().map((tName) => (
+                                  <option key={tName} value={tName} className="text-slate-950">💰 {tName}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">تاريخ تاريخ المعاملة</label>
+                              <input 
+                                type="date" 
+                                required
+                                value={advDate} 
+                                onChange={(e) => setAdvDate(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none font-mono" 
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">سبب السلفة وملاحظات الإفصاح</label>
+                              <textarea 
+                                placeholder="مثلاً: سلفة اضطرارية لدفع مصاريف عائلية..." 
+                                value={advNotes}
+                                onChange={(e) => setAdvNotes(e.target.value)}
+                                className="w-full px-2.5 py-2 h-16 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none"
+                              />
+                            </div>
+
+                            <button type="submit" disabled={isLoading} className="w-full py-2.5 bg-rose-500 hover:bg-rose-400 text-slate-950 text-xs font-black rounded-lg transition-colors shadow-lg">
+                              {isLoading ? "جاري المعاملة..." : "إيداع وصرف طلب السلفة المباشر"}
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+
+                      {/* Column 3: Leaves & Vacations Management */}
+                      <div className="lg:col-span-1 space-y-6">
+                        {/* Leaves Overview and registration history */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-xs font-black text-teal-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                            <span>🏖️</span>
+                            <span>بيانات الإجازات السنوية المسجلة</span>
+                          </h4>
+
+                          <div className="flex items-center justify-between p-3 bg-teal-500/10 rounded-xl border border-teal-500/10">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-bold">الرصيد السنوي المعتمد</span>
+                              <span className="text-xs font-black text-white block mt-0.5 font-mono">{contract.vacation || 30} يوم/سنة</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] text-slate-400 block font-bold">الإجازات المستهلكة</span>
+                              <span className="text-xs font-black text-amber-500 block mt-0.5 font-mono">{leavesList.length} مرات</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] text-slate-400 block font-bold">تاريخ وسجل الإجازات السابقة ({leavesList.length})</label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                              {leavesList.length === 0 ? (
+                                <span className="text-[10px] text-slate-500 block text-center py-4 bg-slate-950/50 rounded-xl">لا توجد إجازات مسجلة في ملف الخدمة الذاتية حالياً.</span>
+                              ) : (
+                                leavesList.map((l, lIdx) => (
+                                  <div key={lIdx} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300">
+                                    <div className="flex justify-between font-black text-[10px] text-teal-400">
+                                      <span>🏝️ {l.type}</span>
+                                      <span className="text-[9px] text-slate-400">من {l.start} إلى {l.end}</span>
+                                    </div>
+                                    {l.notes && <p className="text-[10px] text-slate-400 mt-1 truncate font-sans">{l.notes}</p>}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Leave Request Form */}
+                        <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+                          <h4 className="text-xs font-black text-teal-400 flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                            <span>✍️</span>
+                            <span>تسجيل وتأكيد إجازة رسمية ذاتية</span>
+                          </h4>
+
+                          <form onSubmit={(e) => addSelfWorkerLeaveLogic(e, profileWorker)} className="space-y-3.5">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-bold block">تاريخ البداية</label>
+                                <input 
+                                  type="date" 
+                                  required
+                                  value={lhStart} 
+                                  onChange={(e) => setLhStart(e.target.value)} 
+                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-mono" 
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-400 font-bold block">تاريخ النهاية</label>
+                                <input 
+                                  type="date" 
+                                  required
+                                  value={lhEnd} 
+                                  onChange={(e) => setLhEnd(e.target.value)} 
+                                  className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500 font-mono" 
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">تصنيف الإجازة</label>
+                              <select 
+                                value={lhType} 
+                                onChange={(e) => setLhType(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-white focus:outline-none cursor-pointer text-slate-950 bg-white"
+                              >
+                                <option value="إجازة اعتيادية" className="text-slate-950">إجازة اعتيادية سنوية</option>
+                                <option value="إجازة مرضية" className="text-slate-950">إجازة مرضية موثقة</option>
+                                <option value="إجازة اضطرارية" className="text-slate-950">إجازة اضطرارية طارئة</option>
+                                <option value="دون راتب" className="text-slate-950">إجازة دون راتب</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-400 font-bold block">ملاحظات أو مبررات طلب الإجازة</label>
+                              <input 
+                                placeholder="ملاحظات وتوضيحات..." 
+                                value={lhNotes} 
+                                onChange={(e) => setLhNotes(e.target.value)} 
+                                className="w-full px-2.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-none focus:border-emerald-500" 
+                              />
+                            </div>
+
+                            <button type="submit" disabled={isLoading} className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black rounded-lg transition-colors shadow-lg">
+                              {isLoading ? "جاري التسجيل..." : "تسجيل وتأكيد الإجازة في ملف الخدمة"}
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
