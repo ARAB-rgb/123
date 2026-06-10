@@ -2804,27 +2804,39 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                     <p className="text-[11px] text-slate-400 mt-1">الاطلاع الذاتي المباشر على بنود العقد، تسجيل الإجازات الذاتية، ومتابعة الأرصدة وطلب السلف المالية العاجلة.</p>
                   </div>
                   
-                  {/* Dropdown for testing or changing scope */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-400 font-bold shrink-0">ملف الموظف المعين:</span>
-                    <select
-                      value={selfSelectedWorkerId || workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id || ""}
-                      onChange={(e) => setSelfSelectedWorkerId(e.target.value)}
-                      className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-amber-400 focus:outline-none cursor-pointer max-w-xs text-slate-950 bg-white"
-                    >
-                      <option value="" className="text-slate-950">--- اختر ملف موظف للتصفح الجاري ---</option>
-                      {workers.map((w) => (
-                        <option key={w.id} value={w.id} className="text-slate-950">
-                          👷 {w.name} - {w.job} ({w.worker_id || "دون ID"})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Dropdown for testing or changing scope only if admin or can("workers") */}
+                  {(currentUser?.role === "admin" || can("workers")) ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400 font-bold shrink-0">ملف الموظف المعين:</span>
+                      <select
+                        value={selfSelectedWorkerId || workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id || ""}
+                        onChange={(e) => setSelfSelectedWorkerId(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-amber-400 focus:outline-none cursor-pointer max-w-xs text-slate-950 bg-white"
+                      >
+                        <option value="" className="text-slate-950">--- اختر ملف موظف للتصفح الجاري ---</option>
+                        {workers.map((w) => (
+                          <option key={w.id} value={w.id} className="text-slate-950">
+                            👷 {w.name} - {w.job} ({w.worker_id || "دون ID"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="text-left">
+                      <span className="px-3 py-1 text-[10px] bg-slate-950 border border-slate-850 rounded-lg text-slate-400 font-black font-sans">
+                        🔐 وضع الخدمة الذاتية المحمية
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Main Logic: Retrieve profile worker */}
                 {(() => {
-                  const targetWorkerId = selfSelectedWorkerId || workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id;
+                  const hasFullAccess = currentUser?.role === "admin" || can("workers");
+                  const myLinkedWorkerId = workers.find((w) => w.worker_id === (currentUser?.perms?.worker_id || currentUser?.worker_id))?.id;
+                  
+                  // If hasFullAccess, allow selfSelectedWorkerId, else strictly force their own linked worker ID
+                  const targetWorkerId = hasFullAccess ? (selfSelectedWorkerId || myLinkedWorkerId) : myLinkedWorkerId;
                   const profileWorker = workers.find((w) => w.id === targetWorkerId);
 
                   if (!profileWorker) {
