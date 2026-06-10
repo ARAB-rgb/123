@@ -1065,6 +1065,9 @@ export const Installments: React.FC<InstallmentsProps> = ({
                       const newTreasury = e.target.value;
                       const activeRegion = awExtractRegion(selectedFileContract.notes || "") || "";
                       const activeCap = awExtractCapital(selectedFileContract.notes || "");
+                      const activeCapSource = awExtractCapitalSource(selectedFileContract.notes || "");
+                      const activeCapCompany = awExtractCapitalCompany(selectedFileContract.notes || "");
+                      const activeCapCollection = awExtractCapitalCollection(selectedFileContract.notes || "");
                       const row = {
                         client: selectedFileContract.client,
                         identity: selectedFileContract.identity,
@@ -1088,7 +1091,10 @@ export const Installments: React.FC<InstallmentsProps> = ({
                         notes: awCleanNotes(selectedFileContract.notes || ""),
                         region_input: activeRegion,
                         treasury_input: newTreasury,
-                        capital_input: activeCap
+                        capital_input: activeCap,
+                        capital_source_input: activeCapSource,
+                        capital_company_input: activeCapCompany,
+                        capital_collection_input: activeCapCollection
                       };
                       await onSaveInstallment(row, selectedFileContract.id);
                     }}

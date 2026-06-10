@@ -22,6 +22,17 @@ import { Dashboard } from "./components/Dashboard";
 import { Installments } from "./components/Installments";
 import { Treasury } from "./components/Treasury";
 
+const getStoredTreasuries = (): string[] => {
+  const saved = localStorage.getItem("aw_treasuries");
+  if (saved) {
+    try {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr) && arr.length > 0) return arr;
+    } catch {}
+  }
+  return ["خزنة الشركة", "خزنة التحصيل"];
+};
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
   const [isLoading, setIsLoading] = useState(false);
@@ -105,6 +116,7 @@ export default function App() {
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payProject, setPayProject] = useState("");
   const [payNotes, setPayNotes] = useState("");
+  const [payTreasury, setPayTreasury] = useState("خزنة الشركة");
 
   // 4. Expenses Forms
   const [eName, setEName] = useState("");
@@ -662,7 +674,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       method: payMethod,
       date: payDate,
       project: payProject.trim(),
-      notes: awBuildNotesWithRegion(payNotes, userRegionFilter),
+      notes: awBuildNotesWithRegionAndTreasury(payNotes, userRegionFilter, payTreasury),
     };
 
     setIsLoading(true);
@@ -683,6 +695,7 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       setPayAmount("");
       setPayProject("");
       setPayNotes("");
+      setPayTreasury("خزنة الشركة");
       await loadEverything();
       showToast("تم قيّد سند الصرف بنجاح!");
     } catch {
@@ -1421,17 +1434,47 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                 <div className="border-b border-slate-850 pb-3">
                   <h3 className="text-base font-black text-white flex items-center gap-2"><span>💸</span> تحرير سند صرف صادر للشركة</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <input required placeholder="صرفنا إلى المستفيد" value={payTo} onChange={(e) => setPayTo(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input type="number" required placeholder="مبلغ الصرف" value={payAmount} onChange={(e) => setPayAmount(e.target.value ? Number(e.target.value) : "")} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input placeholder="طريقة الصرف" value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none" />
-                  <input placeholder="الارتباط بالمشروع" value={payProject} onChange={(e) => setPayProject(e.target.value)} className="w-full px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none sm:col-span-2" />
-                  <textarea placeholder="البيان" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-3 py-1.5 h-[41px] bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white sm:col-span-2 focus:outline-none" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400">صرفنا إلى المستفيد</label>
+                    <input required placeholder="صرفنا إلى المستفيد" value={payTo} onChange={(e) => setPayTo(e.target.value)} className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400">مبلغ الصرف</label>
+                    <input type="number" required placeholder="مبلغ الصرف" value={payAmount} onChange={(e) => setPayAmount(e.target.value ? Number(e.target.value) : "")} className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-amber-500">حساب الخزنة الممول</label>
+                    <select
+                      value={payTreasury}
+                      onChange={(e) => setPayTreasury(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors cursor-pointer bg-slate-955"
+                    >
+                      {getStoredTreasuries().map((tName) => (
+                        <option key={tName} value={tName} className="bg-slate-950 text-white">💰 {tName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400">طريقة الصرف</label>
+                    <input placeholder="طريقة الصرف" value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400">تاريخ الصرف</label>
+                    <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors hover:text-amber-200" />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2 md:col-span-3">
+                    <label className="text-[10px] font-black text-slate-400">الارتباط بالمشروع</label>
+                    <input placeholder="الارتباط بالمشروع" value={payProject} onChange={(e) => setPayProject(e.target.value)} className="w-full px-3 py-2.5 bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2 md:col-span-4">
+                    <label className="text-[10px] font-black text-slate-400">البيان والتفاصيل</label>
+                    <textarea placeholder="البيان" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-3 py-2 h-[45px] bg-slate-950/40 border border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                  </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   {editPaymentId && (
-                    <button type="button" onClick={() => { setEditPaymentId(null); setPayTo(""); setPayAmount(""); setPayProject(""); setPayNotes(""); }} className="px-5 py-2.5 bg-slate-800 rounded-xl text-xs font-black">إلغاء</button>
+                    <button type="button" onClick={() => { setEditPaymentId(null); setPayTo(""); setPayAmount(""); setPayProject(""); setPayNotes(""); setPayTreasury("خزنة الشركة"); }} className="px-5 py-2.5 bg-slate-800 rounded-xl text-xs font-black">إلغاء</button>
                   )}
                   <button type="submit" className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black">{editPaymentId ? "استبدال وصيغة السند" : "قيد سند الصرف ماليًا"}</button>
                 </div>
@@ -1457,13 +1500,16 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
                         <td className="py-3 px-3 font-mono text-slate-400">{p.date}</td>
                         <td className="py-3 px-3 font-black text-white">{p.to_name}</td>
                         <td className="py-3 px-3 font-black text-rose-400 font-mono">-{p.amount.toLocaleString()} ريال</td>
-                        <td className="py-3 px-3 font-bold">{p.method}</td>
+                        <td className="py-3 px-3 font-bold">
+                          <span className="block">{p.method}</span>
+                          <span className="block text-[10px] text-amber-400 font-extrabold mt-0.5 font-sans">🏦 {awExtractTreasury(p.notes || "") || "خزنة الشركة"}</span>
+                        </td>
                         <td className="py-3 px-3 text-slate-400">
                           <b className="text-white text-[11px] block">{p.project}</b>
                           {awCleanNotes(p.notes || "")}
                         </td>
                         <td className="py-3 px-3 text-center space-x-1">
-                          <button onClick={() => { setEditPaymentId(p.id); setPayTo(p.to_name); setPayAmount(p.amount); setPayMethod(p.method); setPayDate(p.date); setPayProject(p.project); setPayNotes(awCleanNotes(p.notes || "")); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setEditPaymentId(p.id); setPayTo(p.to_name); setPayAmount(p.amount); setPayMethod(p.method); setPayDate(p.date); setPayProject(p.project); setPayNotes(awCleanNotes(p.notes || "")); setPayTreasury(awExtractTreasury(p.notes || "") || "خزنة الشركة"); }} className="p-1 text-blue-400 hover:text-white"><Edit2 className="w-3.5 h-3.5" /></button>
                           <button onClick={() => { if(confirm("تأكيد الحذف؟")) { sb.from("payments").delete().eq("id", p.id).then(() => loadEverything()); } }} className="p-1 text-rose-400 hover:text-rose-500"><Trash2 className="w-3.5 h-3.5" /></button>
                         </td>
                       </tr>
