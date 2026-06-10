@@ -69,6 +69,66 @@ export const Installments: React.FC<InstallmentsProps> = ({
   const [capitalCompany, setCapitalCompany] = useState<number | "">("");
   const [capitalCollection, setCapitalCollection] = useState<number | "">("");
   const [dynamicTreasuries, setDynamicTreasuries] = useState<string[]>(getStoredTreasuries);
+  const [isCapitalManuallyEdited, setIsCapitalManuallyEdited] = useState(false);
+
+  // Capital reactive sync / default computation
+  useEffect(() => {
+    if (editId || isCapitalManuallyEdited) return;
+    
+    // Auto populate capital based on amount and paid (The reactive feature)
+    const calculatedCapital = Math.max(0, Number(amount || 0) - Number(paid || 0));
+    if (calculatedCapital > 0) {
+      if (capitalSource === "كلاهما") {
+        setCapitalCompany(calculatedCapital * 0.5);
+        setCapitalCollection(calculatedCapital * 0.5);
+        setCapital("");
+      } else {
+        setCapital(calculatedCapital);
+        setCapitalCompany("");
+        setCapitalCollection("");
+      }
+    } else {
+      setCapital("");
+      setCapitalCompany("");
+      setCapitalCollection("");
+    }
+  }, [amount, paid, capitalSource, editId, isCapitalManuallyEdited]);
+
+  const handleCapitalSourceChange = (newSource: "شركة" | "تحصيل" | "كلاهما") => {
+    setCapitalSource(newSource);
+    
+    // Convert / transfer existing values seamlessly
+    if (newSource === "كلاهما") {
+      const currentTotal = Number(capital || 0);
+      if (currentTotal > 0) {
+        setCapitalCompany(currentTotal * 0.5);
+        setCapitalCollection(currentTotal * 0.5);
+      }
+      setCapital("");
+    } else {
+      const computedTotal = Number(capitalCompany || 0) + Number(capitalCollection || 0);
+      if (computedTotal > 0) {
+        setCapital(computedTotal);
+      }
+      setCapitalCompany("");
+      setCapitalCollection("");
+    }
+  };
+
+  const handleCapitalChange = (val: string) => {
+    setCapital(val ? Number(val) : "");
+    setIsCapitalManuallyEdited(true);
+  };
+
+  const handleCapitalCompanyChange = (val: string) => {
+    setCapitalCompany(val ? Number(val) : "");
+    setIsCapitalManuallyEdited(true);
+  };
+
+  const handleCapitalCollectionChange = (val: string) => {
+    setCapitalCollection(val ? Number(val) : "");
+    setIsCapitalManuallyEdited(true);
+  };
 
   // Filters State
   const [qSearch, setQSearch] = useState("");
@@ -153,6 +213,7 @@ export const Installments: React.FC<InstallmentsProps> = ({
     setCapitalSource("شركة");
     setCapitalCompany("");
     setCapitalCollection("");
+    setIsCapitalManuallyEdited(false);
   };
 
   const handleEdit = (x: Installment) => {
@@ -178,6 +239,7 @@ export const Installments: React.FC<InstallmentsProps> = ({
     setCapitalSource(awExtractCapitalSource(x.notes || ""));
     setCapitalCompany(awExtractCapitalCompany(x.notes || "") || "");
     setCapitalCollection(awExtractCapitalCollection(x.notes || "") || "");
+    setIsCapitalManuallyEdited(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -508,12 +570,12 @@ export const Installments: React.FC<InstallmentsProps> = ({
               </select>
             </div>
 
-            <div className="space-y-1">
+             <div className="space-y-1">
               <label className="text-[10px] font-black text-amber-400">جهة تمويل رأس مال العقد</label>
               <select
                 value={capitalSource}
-                onChange={(e) => setCapitalSource(e.target.value as any)}
-                className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-colors bg-slate-950"
+                onChange={(e) => handleCapitalSourceChange(e.target.value as any)}
+                className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-colors bg-slate-950 cursor-pointer"
               >
                 <option value="شركة" className="bg-slate-950 text-white">💰 خزنة الشركة</option>
                 <option value="تحصيل" className="bg-slate-950 text-white">💰 خزنة التحصيل</option>
@@ -523,38 +585,167 @@ export const Installments: React.FC<InstallmentsProps> = ({
 
             {capitalSource !== "كلاهما" ? (
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-amber-400">قيمة رأس مال العقد (تمويل البداية)</label>
+                <label className="text-[10px] font-black text-amber-400 flex items-center justify-between">
+                  <span>قيمة رأس مال العقد (تمويل البداية)</span>
+                  {isCapitalManuallyEdited && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCapitalManuallyEdited(false);
+                      }}
+                      className="text-[8px] text-blue-400 underline font-sans hover:text-blue-300"
+                    >
+                      (تفعيل تلقائي متبقي)
+                    </button>
+                  )}
+                </label>
                 <input
                   type="number"
                   placeholder="رأس المال المدفوع لتأسيس العقد"
                   value={capital}
-                  onChange={(e) => setCapital(e.target.value ? Number(e.target.value) : "")}
+                  onChange={(e) => handleCapitalChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-xs font-bold text-amber-200 focus:outline-none focus:border-blue-500 transition-colors"
                 />
+                
+                {/* Real-time interactive autofill helper badges */}
+                {Number(amount || 0) > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCapital(Number(amount || 0));
+                        setIsCapitalManuallyEdited(true);
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-slate-950/60 text-slate-300 border border-slate-800 rounded hover:bg-slate-800 transition font-sans"
+                    >
+                      كامل العقد ({Number(amount).toLocaleString()})
+                    </button>
+                    {Number(paid || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCapital(Math.max(0, Number(amount || 0) - Number(paid || 0)));
+                          setIsCapitalManuallyEdited(true);
+                        }}
+                        className="text-[9px] px-2 py-0.5 bg-slate-950/60 text-amber-400 border border-slate-800 rounded hover:bg-slate-800 transition font-sans"
+                      >
+                        المتبقي ({Math.max(0, Number(amount || 0) - Number(paid || 0)).toLocaleString()})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCapital(Math.round(Number(amount || 0) * 0.7));
+                        setIsCapitalManuallyEdited(true);
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-slate-950/60 text-slate-300 border border-slate-800 rounded hover:bg-slate-800 transition font-sans"
+                    >
+                      70٪ عصف ({Math.round(Number(amount || 0) * 0.7).toLocaleString()})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCapital(Math.round(Number(amount || 0) * 0.8));
+                        setIsCapitalManuallyEdited(true);
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-slate-950/60 text-slate-300 border border-slate-800 rounded hover:bg-slate-800 transition font-sans"
+                    >
+                      80٪ عصف ({Math.round(Number(amount || 0) * 0.8).toLocaleString()})
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-amber-400">كم دفع الشركة من رأس المال؟</label>
+                  <span className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-amber-400">كم دفع الشركة من رأس المال؟</label>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {Number(amount || 0) > 0 ? `${((Number(capitalCompany || 0) / (Number(amount || 0) - Number(paid || 0) || 1)) * 100).toFixed(0)}٪` : ""}
+                    </span>
+                  </span>
                   <input
                     type="number"
                     placeholder="تمويل من خزنة الشركة"
                     value={capitalCompany}
-                    onChange={(e) => setCapitalCompany(e.target.value ? Number(e.target.value) : "")}
+                    onChange={(e) => handleCapitalCompanyChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-xs font-bold text-amber-200 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-amber-400">كم دفع التحصيل من رأس المال؟</label>
+                  <span className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-amber-400">كم دفع التحصيل من رأس المال؟</label>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {Number(amount || 0) > 0 ? `${((Number(capitalCollection || 0) / (Number(amount || 0) - Number(paid || 0) || 1)) * 100).toFixed(0)}٪` : ""}
+                    </span>
+                  </span>
                   <input
                     type="number"
                     placeholder="تمويل من خزنة التحصيل"
                     value={capitalCollection}
-                    onChange={(e) => setCapitalCollection(e.target.value ? Number(e.target.value) : "")}
+                    onChange={(e) => handleCapitalCollectionChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-950/40 border border-slate-850 rounded-xl text-xs font-bold text-amber-200 focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div className="sm:col-span-2 text-left pt-1">
+                
+                {/* Live division ratio buttons */}
+                <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 items-start sm:items-center border-t border-amber-500/10 pt-3 justify-between">
+                  <div className="flex gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = Math.max(0, Number(amount || 0) - Number(paid || 0)) || Number(amount || 0);
+                        if (total > 0) {
+                          setCapitalCompany(Math.round(total * 0.5));
+                          setCapitalCollection(total - Math.round(total * 0.5));
+                          setIsCapitalManuallyEdited(true);
+                        }
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded hover:bg-amber-500/20 transition font-sans"
+                    >
+                      ⚖️ مناصفة 50/50
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = Math.max(0, Number(amount || 0) - Number(paid || 0)) || Number(amount || 0);
+                        if (total > 0) {
+                          setCapitalCompany(Math.round(total * 0.7));
+                          setCapitalCollection(total - Math.round(total * 0.7));
+                          setIsCapitalManuallyEdited(true);
+                        }
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded hover:bg-amber-500/20 transition font-sans"
+                    >
+                      🏢 الشركة 70٪ / التحصيل 30٪
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = Math.max(0, Number(amount || 0) - Number(paid || 0)) || Number(amount || 0);
+                        if (total > 0) {
+                          setCapitalCompany(Math.round(total * 0.8));
+                          setCapitalCollection(total - Math.round(total * 0.8));
+                          setIsCapitalManuallyEdited(true);
+                        }
+                      }}
+                      className="text-[9px] px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded hover:bg-amber-500/20 transition font-sans"
+                    >
+                      🏢 الشركة 80٪ / التحصيل 20٪
+                    </button>
+                    {isCapitalManuallyEdited && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCapitalManuallyEdited(false);
+                        }}
+                        className="text-[9px] px-2 py-0.5 bg-blue-600/10 text-blue-300 border border-blue-500/20 rounded hover:bg-blue-600/20 transition font-sans"
+                      >
+                        🔄 إعادة التفعيل التلقائي
+                      </button>
+                    )}
+                  </div>
+
                   <span className="text-[11px] font-black text-amber-300">
                     💡 إجمالي رأس مال العقد المشترك: {((Number(capitalCompany || 0) + Number(capitalCollection || 0))).toLocaleString()} ريال
                   </span>

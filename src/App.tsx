@@ -13,7 +13,8 @@ import {
 import { User as AuthUser, Installment, Quote, Receipt, Payment, Expense, Project, Worker, DbSession } from "./types";
 import {
   sb, logSession, getContractTiming, awExtractRegion, awCleanNotes,
-  awBuildNotesWithRegion, awBuildNotesWithRegionAndTreasury, awBuildNotesWithRegionAndTreasuryAndCapital, awExtractTreasury, awExtractCapital, generateNextNo
+  awBuildNotesWithRegion, awBuildNotesWithRegionAndTreasury, awBuildNotesWithRegionAndTreasuryAndCapital, awExtractTreasury, awExtractCapital, generateNextNo,
+  awExtractCapitalSource, awExtractCapitalCompany, awExtractCapitalCollection
 } from "./db";
 
 import { Toast, ToastItem, ToastType } from "./components/Shared/Toast";
@@ -1028,6 +1029,25 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
     );
   }
 
+  let companyCapitalInContracts = 0;
+  let collectionCapitalInContracts = 0;
+
+  installments.forEach((x) => {
+    const source = awExtractCapitalSource(x.notes || "");
+    const compAmount = awExtractCapitalCompany(x.notes || "");
+    const collAmount = awExtractCapitalCollection(x.notes || "");
+    const totalCap = awExtractCapital(x.notes || "");
+
+    if (source === "شركة") {
+      companyCapitalInContracts += totalCap;
+    } else if (source === "تحصيل") {
+      collectionCapitalInContracts += totalCap;
+    } else if (source === "كلاهما") {
+      companyCapitalInContracts += compAmount;
+      collectionCapitalInContracts += collAmount;
+    }
+  });
+
   return (
     <div className="min-h-screen mesh-gradient text-slate-100 flex flex-col md:flex-row text-right font-sans relative" dir="rtl">
       
@@ -1107,14 +1127,39 @@ td{border:1px solid #d8dee9;padding:8px;text-align:center;font-weight:600}
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Responsive Navbar heading with glowing sparkles */}
-        <header className="bg-white/5 backdrop-blur-lg border-b border-white/5 p-5 shrink-0 flex justify-between items-center z-10 text-right">
+        <header className="bg-white/5 backdrop-blur-lg border-b border-white/5 p-4 md:p-5 shrink-0 flex flex-col sm:flex-row gap-4 justify-between items-center z-10 text-right">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-            <h1 className="text-base font-black text-white">شركة عرب وورلد للمقاولات العامة والتقسيط</h1>
+            <h1 className="text-sm md:text-base font-black text-white">شركة عرب وورلد للمقاولات العامة والتقسيط</h1>
           </div>
-          <span className="text-[10px] font-black font-mono text-slate-300 bg-white/5 px-3.5 py-1.5 rounded-full border border-white/10">
-            نظام مالي موحد • V27 STABLE
-          </span>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* رأس مال الشركة في العقود */}
+            <div className="bg-slate-900/80 border border-amber-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-right">
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+              <div>
+                <span className="block text-[8px] md:text-[9px] font-bold text-slate-400 leading-normal">رأس مال الشركة بالعقود</span>
+                <span className="block text-xs font-black text-blue-300 font-mono">
+                  {companyCapitalInContracts.toLocaleString()} <span className="text-[9px] font-normal">ريال</span>
+                </span>
+              </div>
+            </div>
+
+            {/* رأس مال التحصيل في العقود */}
+            <div className="bg-slate-900/80 border border-emerald-500/20 px-3 py-1.5 rounded-xl flex items-center gap-2 text-right">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <div>
+                <span className="block text-[8px] md:text-[9px] font-bold text-slate-400 leading-normal">رأس مال التحصيل بالعقود</span>
+                <span className="block text-xs font-black text-emerald-300 font-mono">
+                  {collectionCapitalInContracts.toLocaleString()} <span className="text-[9px] font-normal">ريال</span>
+                </span>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-black font-mono text-slate-300 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 shrink-0">
+              نظام مالي موحد • V27 STABLE
+            </span>
+          </div>
         </header>
 
         {/* Interactive Dynamic Layout content wrapper */}
